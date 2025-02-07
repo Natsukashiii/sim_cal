@@ -1,0 +1,15 @@
+
+# ---- IntelliJ IDEA / PyCharm ----
+.idea/
+*.iml
+workspace.xml
+.DS_Store
+/0_result
+/algori/__pycache__
+/cluster/__pycache__
+/compute/__pycache__
+/utils/__pycache__
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

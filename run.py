@@ -12,7 +12,7 @@ from utils.file import save_all_results_to_csv
 from utils.config import load_attributes,load_normalize,load_integrate_level
 
 # This number is used to pick the top N repositories from the similarity matrix for testing the function(to reduce the computation time)
-PICK_REPO_NUM = 10
+PICK_REPO_NUM = 100
 
 def compare_multiple_attributes():
     """
@@ -63,6 +63,26 @@ def compare_multiple_attributes():
         # list(distance_matrix_map.keys()),
         "normalize_distance.pdf"
     )
+
+    print("-------------------------------------- 5. Build Stretch --------------------------------------")
+    # Todo how to change the cluster numbers (by stretch distance) -> the distance is too small so the sillu is hard to control
+    # *10  （[logf(x+e)]-1）*10    # Todo how to change the cluster numbers (by stretch distance) -> the distance is too small so the sillu is hard to control
+    # this part can be deleted
+
+
+    distance_matrix_map_stretch = {}
+    for source, distance_matrix in distance_matrix_map.items():
+        stretched_distance_matrix = align.distance_stretch(distance_matrix, source)
+        distance_matrix_map_stretch[source] = stretched_distance_matrix
+
+    visualize_combined_matrices(
+        list(distance_matrix_map_stretch.values()),
+        attributes,
+        "normalize_distance_stretched.pdf"
+    )
+    distance_matrix_map=distance_matrix_map_stretch
+
+
     print("-------------------------------------- 2. Generate Combinations --------------------------------------")
     combinations = list(itertools.combinations(attributes, integrate_level))
     print(f"Generated combinations: {combinations}")

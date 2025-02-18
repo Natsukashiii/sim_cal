@@ -180,9 +180,8 @@ def visualize_comparison_multiple(
     plt.savefig(os.path.join(RESULT_DIR, file_name), format='pdf')
 
 
-def visualize_combined_matrices(
-    distance_matrices, labels, file_name, bins=50
-):
+
+def visualize_combined_matrices(distance_matrices, labels, file_name, bins=50):
     """
     Visualize the combined distribution of multiple distance matrices with dual y-axes.
 
@@ -195,38 +194,29 @@ def visualize_combined_matrices(
     assert len(distance_matrices) == len(labels), \
         "The number of matrices and labels must match."
 
-    # Prepare data for visualization
     combined_data = []
     for i, matrix in enumerate(distance_matrices):
-        # Extract the upper triangle
         upper_triangle = matrix[np.triu_indices(matrix.shape[0], k=1)]
 
-        # Validate data range
         min_val, max_val = upper_triangle.min(), upper_triangle.max()
         print(f"Matrix {labels[i]} - Min Value: {min_val:.6f}, Max Value: {max_val:.6f}")
 
-        # Optionally normalize data to [0, 1] if needed
-        if min_val < 0 or max_val > 1:
-            print(f"Matrix {labels[i]} contains values outside [0, 1]. Normalizing...")
-            upper_triangle = (upper_triangle - min_val) / (max_val - min_val + 1e-6)
-
-        # Collect data for visualization
         combined_data.extend([(x, labels[i]) for x in upper_triangle])
 
-    # Convert data to DataFrame
     combined_df = pd.DataFrame(combined_data, columns=["Value", "Attribute"])
 
-    # Initialize figure and axis
+    actual_min = combined_df["Value"].min()
+    actual_max = combined_df["Value"].max()
+
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    # Plot histograms
     for label in labels:
         subset = combined_df[combined_df["Attribute"] == label]["Value"]
         sns.histplot(
             subset,
             bins=bins,
             kde=False,
-            stat="count",  # Use count for the left y-axis
+            stat="count",
             label=label,
             element="bars",
             alpha=0.4,
@@ -234,36 +224,33 @@ def visualize_combined_matrices(
             ax=ax1
         )
 
-    # Set labels and title for the histogram
     ax1.set_xlabel("Distance Value")
     ax1.set_ylabel("Frequency (Count)", color="black")
     ax1.set_title("Distance Distribution")
     ax1.legend(title="Attribute", loc="upper left")
 
-    # Create secondary y-axis for KDE
     ax2 = ax1.twinx()
 
-    # Plot KDE for each source
     for label in labels:
         subset = combined_df[combined_df["Attribute"] == label]["Value"]
         sns.kdeplot(
             subset,
             ax=ax2,
             label=f"{label} (Density)",
-            linestyle="--"
+            linestyle="--",
+            clip=(actual_min, actual_max)
         )
 
-    # Set labels for KDE axis
     ax2.set_ylabel("Density", color="black")
 
-    # Align y-axis scales
-    ax1.set_ylim(0, ax1.get_ylim()[1])  # Match left y-axis scale
-    ax2.set_ylim(0, ax2.get_ylim()[1])  # Match right y-axis scale
+    plt.xlim(actual_min, actual_max)
 
-    # Save the plot
-    plt.xlim(0, 1)
+    ax1.set_ylim(0, ax1.get_ylim()[1])
+    ax2.set_ylim(0, ax2.get_ylim()[1])
+
     plt.tight_layout()
     plt.savefig(os.path.join(RESULT_DIR, file_name), format='pdf')
+
 
 def visualize_two_compare_matrix(matrix1, matrix2,  crop_ratio, file_name,min_val=0, max_val=1,):
     # Ensure inputs are square matrices

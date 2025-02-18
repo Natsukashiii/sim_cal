@@ -9,6 +9,8 @@ from sklearn.metrics import jaccard_score
 
 REPOS_FILE_PATH = "input/repos.txt"
 
+# todo hashcode with 3number, tuple geometric space
+
 def mock_sim1():
     """
      Levenshtein Distance

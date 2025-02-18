@@ -55,6 +55,25 @@ def stretch(original_matrix, source_name, crop_ratio=0):
 
     return reshaped_original_matrix, min_val, max_val, crop_ratio
 
+
+def distance_stretch(original_matrix, source_name):
+    """
+    y = (log(f(x) + 1) - 1) * 10
+    f(x) = original_matrix + 1，
+    """
+    if isinstance(original_matrix, pd.DataFrame):
+        original_matrix = original_matrix.to_numpy()
+
+    adjusted_matrix = original_matrix +(np.e)
+    stretched_matrix = (np.log(adjusted_matrix)-1) * 10
+
+    # adjusted_matrix = original_matrix +1
+    # stretched_matrix = (np.log(adjusted_matrix)) * 10
+
+    print(f"[{source_name}] Distance Stretch Applied: Min={np.min(stretched_matrix)}, Max={np.max(stretched_matrix)}, Mean={np.mean(stretched_matrix)}")
+
+    return stretched_matrix
+
 def reshape_matrix(original_data, matrix_size):
     """
     Restore the expanded upper triangular data to a symmetric matrix form.

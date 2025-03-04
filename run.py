@@ -7,12 +7,13 @@ import algori
 from algori import align, distance, combine
 from compute import overlap
 from cluster.distance import analysis_tuple_matrix
-from cluster.visualize import visualize_two_compare_matrix, visualize_combined_matrices, visualize_comparison_multiple
+from cluster.visualize import visualize_heatmap, visualize_combined_matrices, visualize_comparison_multiple
 from utils.file import save_all_results_to_csv
 from utils.config import load_attributes,load_normalize,load_integrate_level
 
 # This number is used to pick the top N repositories from the similarity matrix for testing the function(to reduce the computation time)
-PICK_REPO_NUM = 100
+PICK_REPO_NUM = None
+GEN_HEATMAP = False
 
 def compare_multiple_attributes():
     """
@@ -43,7 +44,9 @@ def compare_multiple_attributes():
                                   normalize_sim_matrix_list,
                                   labels=attributes,
                                   file_name="normalize_similarity.pdf")
-
+    if GEN_HEATMAP:
+        visualize_heatmap(aligned_sim_matrix_list, attributes, "rq1_matrix_compare_before_normalize.pdf")
+        visualize_heatmap(normalize_sim_matrix_list, attributes, "rq1_matrix_compare.pdf")
     print("-------------------------------------- 4. Build Distance --------------------------------------")
     distance_matrix_map = {}
     for normalized_sim_matrix,reops, source in normalize_sim_matrix_list:
@@ -53,9 +56,8 @@ def compare_multiple_attributes():
     for source, distance_matrix in distance_matrix_map.items():
         if isinstance(distance_matrix, tuple):
             distance_matrix = distance_matrix[0]
-        min_val = align.get_min_max(distance_matrix)
-        mean_val = np.mean(distance_matrix)
-        print(f"Source: {source}, Min: {min_val}, Max: {min_val}, Mean: {mean_val}")
+        min,max,mean = align.get_min_max(distance_matrix)
+        print(f"Source: {source}, Min: {min}, Max: {max}, Mean: {mean}")
 
     visualize_combined_matrices(
         list(distance_matrix_map.values()),
@@ -70,17 +72,17 @@ def compare_multiple_attributes():
     # this part can be deleted
 
 
-    distance_matrix_map_stretch = {}
-    for source, distance_matrix in distance_matrix_map.items():
-        stretched_distance_matrix = align.distance_stretch(distance_matrix, source)
-        distance_matrix_map_stretch[source] = stretched_distance_matrix
-
-    visualize_combined_matrices(
-        list(distance_matrix_map_stretch.values()),
-        attributes,
-        "normalize_distance_stretched.pdf"
-    )
-    distance_matrix_map=distance_matrix_map_stretch
+    # distance_matrix_map_stretch = {}
+    # for source, distance_matrix in distance_matrix_map.items():
+    #     stretched_distance_matrix = align.distance_stretch(distance_matrix, source)
+    #     distance_matrix_map_stretch[source] = stretched_distance_matrix
+    #
+    # visualize_combined_matrices(
+    #     list(distance_matrix_map_stretch.values()),
+    #     attributes,
+    #     "normalize_distance_stretched.pdf"
+    # )
+    # distance_matrix_map=distance_matrix_map_stretch
 
 
     print("-------------------------------------- 2. Generate Combinations --------------------------------------")
@@ -175,10 +177,10 @@ def compare_two_attributes(source1,source2):
 
     distance_matrix_1 = algori.distance.build_distance_matrix(processed_sim_matrix1)
     distance_matrix_2 = algori.distance.build_distance_matrix(processed_sim_matrix2)
-    print(
-        f"Origin distance1:np.min besides 0: {align.get_min_max(distance_matrix_1)}, np.mean = {np.mean((distance_matrix_1))}, np.max = {np.max(distance_matrix_1)}")
-    print(
-        f"Origin distance2:np.min besides 0: {align.get_min_max(distance_matrix_2)}, np.mean = {np.mean((distance_matrix_2))}, np.max = {np.max(distance_matrix_2)}")
+    min1, max1, mean1 = align.get_min_max(distance_matrix_1)
+    min2, max2, mean2 = align.get_min_max(distance_matrix_2)
+    print(f"Origin distance1:np.min besides 0: {min1}, np.mean = {mean1}, np.max = {max1}")
+    print(f"Origin distance2:np.min besides 0: {min2}, np.mean = {mean2}, np.max = {max2}")
     visualize_combined_matrices(
         distance_matrices=[distance_matrix_1, distance_matrix_2],
         labels=[f"Attribute-1{source1}", f"Attribute-2{source2}"],

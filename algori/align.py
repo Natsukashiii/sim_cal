@@ -205,8 +205,8 @@ def print_stats(step, data, crop_ratio=None):
 def align_list(
     data: List[Tuple[np.ndarray, List[str]]],
     repo_num: Optional[int] = None,
-    deterministic: bool = True,  # 开关：是否固定随机性
-    seed: int = 42  # 可选：固定的随机种子值
+    deterministic: bool = True,
+    seed: int = 42
 ) -> List[Tuple[np.ndarray, List[str]]]:
     """
     Aligns a list of similarity matrices and their associated repositories based on common repositories.
@@ -249,8 +249,8 @@ def find_common_repos(data: List[Tuple[np.ndarray, List[str]]]) -> Set[str]:
 
 def align_single(similarity_matrix: np.ndarray, repos: List[str], common_repos: Set[str]) -> Tuple[
     np.ndarray, List[str]]:
-    aligned_repos = [repo for repo in repos if repo in common_repos]
 
+    aligned_repos = [repo for repo in repos if repo in common_repos]
     repo_to_index = {repo: idx for idx, repo in enumerate(repos)}
 
     size = len(aligned_repos)
@@ -273,9 +273,22 @@ def align_single(similarity_matrix: np.ndarray, repos: List[str], common_repos: 
 
 
 def get_min_max(data):
+    """
+    Returns the minimum, maximum, and mean values from the given data,
+    excluding zero values.
+
+    Args:
+        data (numpy.ndarray): The input numerical data (e.g., similarity or distance matrix).
+
+    Returns:
+        tuple: (min_value, max_value, mean_value)
+    """
     non_zero_data = data[data > 0]
-    return non_zero_data.min()
-    return 0
+
+    if non_zero_data.size == 0:
+        return None, None, None
+
+    return non_zero_data.min(), non_zero_data.max(), non_zero_data.mean()
 
 
 def random_subset(repos: Set[str], repo_num: int, seed: int = None) -> Set[str]:

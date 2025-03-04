@@ -5,17 +5,14 @@ from typing import re
 import re
 import numpy as np
 import pandas as pd
-from utils.path import BASELINE_CROSSSIM,BASELINE_REPOPAL,BASELINE_MUDABLUE,INPUT_DIR
-from data_process.mock import mock_sim1,mock_sim2,mock_sim3
-
-REPOPAL_RESULT = os.path.join(BASELINE_REPOPAL, "result_readme")
-CROSSSIM_RESULT = os.path.join(BASELINE_CROSSSIM, "result")
-MUDABLUE_RESULT = BASELINE_MUDABLUE
+from utils.path import CROSSSIM_RESULT,REPOPAL_RESULT,MUDABLUE_RESULT,INPUT_DIR,REPOPAL_RESULT
+from data_process.mock import mock_sim1,mock_sim2,mock_sim3,mock_sim4,mock_sim5
 
 
-def load_data(source_name, random_seed=42):
+
+def load_data(source_name, random_seed = 42):
     similarity_file_path = os.path.join(INPUT_DIR, f"{source_name}.csv")
-    repos_file_path = os.path.join(INPUT_DIR, "repos.txt")
+    repos_file_path = REPOPAL_RESULT
 
     if os.path.exists(similarity_file_path):
         print(f"Loading {source_name} data from saved file.")
@@ -36,6 +33,10 @@ def load_data(source_name, random_seed=42):
             df = mock_sim2()
         elif source_name == "mock3":
             df = mock_sim3()
+        elif source_name == "mock4":
+            df = mock_sim4()
+        elif source_name == "mock5":
+            df = mock_sim5()
         else:
             print("Not valid datasoure")
 
@@ -107,7 +108,7 @@ def extract_repopal():
         raise FileNotFoundError(f"Directory not found: {REPOPAL_RESULT}")
 
     for file_name in os.listdir(REPOPAL_RESULT):
-        if file_name.endswith('.txt') and '|' in file_name:
+        if file_name.endswith('.txt') and ('|' in file_name or '__' in file_name):
             file_path = os.path.join(REPOPAL_RESULT, file_name)
             with open(file_path, 'r') as file:
                 for line in file:

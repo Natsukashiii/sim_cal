@@ -1,12 +1,93 @@
 import os.path
-
 import numpy as np
 from apprise.plugins import sns
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS
 from cluster.distance import  cal_distance
-from utils.path import RESULT_DIR
+from sklearn.metrics import mean_squared_error
+from scipy.stats import spearmanr
 
+from compute.compare_metric import cal_spearman,cal_gromov,cal_frobenius
+from utils.path import RESULT_DIR,PLOTS_DIR
+
+def visualize_heatmap(similarity_matrices, labels, file_name, cmap="YlGnBu"):
+    """
+    Generate heatmaps for Spearman, Frobenius, and Gromov similarity metrics and save as a PDF.
+
+    Parameters:
+    - similarity_matrices: List of similarity matrices [(matrix1, repos1, method1), ...]
+    - labels: Corresponding method labels (e.g., ['repopal', 'crosssim', 'mudablue'])
+    - file_name: Name of the output PDF file
+    - cmap: Color mapping scheme (default 'YlGnBu')
+    """
+    METRICS = ["Spearman", "Frobenius", "Gromov"]
+    num_metrics = len(METRICS)
+
+    fig, axes = plt.subplots(1, num_metrics, figsize=(12, 6))
+
+    for i, metric in enumerate(METRICS):
+        metric_matrix = np.zeros((len(labels), len(labels)))
+
+        for m1_idx, (matrix1, _, method1) in enumerate(similarity_matrices):
+            for m2_idx, (matrix2, _, method2) in enumerate(similarity_matrices):
+                if m1_idx == m2_idx:
+                    if metric == "Spearman":
+                        metric_matrix[m1_idx, m2_idx] = 1  # Spearman correlation self-similarity
+                    elif metric in ["Gromov", "Frobenius"]:
+                        metric_matrix[m1_idx, m2_idx] = 0  # Gromov/Frobenius distance self-similarity
+                    continue  # Skip self-comparison calculations
+
+                print(f"Comparing {method1} vs {method2} for {metric} metric")
+
+                if metric == "Spearman":
+                    correlation, _ = cal_spearman(matrix1, matrix2,f"{method1}_{method2}")
+                    # correlation, _ = spearmanr(matrix1.flatten(), matrix2.flatten())
+                    metric_matrix[m1_idx, m2_idx] = correlation
+                    metric_matrix[m2_idx, m1_idx] = correlation
+
+                elif metric == "Frobenius":
+                    frobenius_dist = cal_frobenius(matrix1, matrix2)
+                    # frobenius_dist = np.linalg.norm(matrix1 - matrix2, 'fro')
+                    metric_matrix[m1_idx, m2_idx] = frobenius_dist
+                    metric_matrix[m2_idx, m1_idx] = frobenius_dist
+
+                elif metric == "Gromov":
+                    gromov_dist = cal_gromov(matrix1, matrix2)
+                    # gromov_dist = mean_squared_error(matrix1.flatten(), matrix2.flatten())
+                    metric_matrix[m1_idx, m2_idx] = gromov_dist
+                    metric_matrix[m2_idx, m1_idx] = gromov_dist
+
+        if np.all(metric_matrix == 0):
+            print(f"Warning: {metric} metric_matrix is all zeros!")
+
+        metric_df = pd.DataFrame(metric_matrix, index=labels, columns=labels)
+
+        sns.heatmap(metric_df, annot=True, fmt=".4f", cmap=cmap, ax=axes[i],
+                    vmin=-1 if metric == "Spearman" else None, vmax=1 if metric == "Spearman" else None,
+                    linewidths=0.5, square=False, cbar=True,cbar_kws={"shrink": 0.21},annot_kws={"size": 9})
+
+        # only keep the first ylabel
+        if i == 0:
+            axes[i].set_yticklabels(axes[i].get_yticklabels(), rotation=60, ha="right")
+        else:
+            axes[i].set_yticklabels([])
+            axes[i].set_ylabel("")
+
+        axes[i].xaxis.set_label_position('top')
+        axes[i].xaxis.tick_top()
+        axes[i].set_aspect(0.3)
+        axes[i].set_yticklabels(axes[i].get_yticklabels(), rotation=0, ha="right")
+
+        axes[i].set_xlabel(f"{metric} Heatmap", fontsize=12)
+        axes[i].xaxis.set_label_coords(0.5, -0.25)
+
+
+    plt.tight_layout()
+
+    output_path = os.path.join(PLOTS_DIR, file_name)
+    plt.savefig(output_path, bbox_inches="tight", dpi=300)
+
+    print(f"Heatmap saved to {output_path}")
 
 
 def visualize_one_matrix(matrix1, file_name,crop_ratio=None, min_val=0, max_val=1):
@@ -33,7 +114,7 @@ def visualize_one_matrix(matrix1, file_name,crop_ratio=None, min_val=0, max_val=
         original_title = f"Original({file_name}) - stretched {min_val:.4f} to {max_val:.4f} - (Total: {len(original_data)})"
 
     # Generate the plot
-    plt.figure(figsize=(8, 6))  # Adjust figure size for single plot
+    plt.figure(figsize=(10, 5))  # Adjust figure size for single plot
     # Plot original data distribution
     plt.hist(
         original_data,
@@ -44,7 +125,7 @@ def visualize_one_matrix(matrix1, file_name,crop_ratio=None, min_val=0, max_val=
         alpha=0.7
     )
     plt.title(original_title, fontsize=12)
-    plt.xlabel("Original Values", fontsize=10)
+    plt.xlabel("Origin al Values", fontsize=10)
     plt.ylabel("Frequency", fontsize=10)
 
     # Save and show the plot
@@ -79,6 +160,15 @@ def visualize_comparison_multiple(
     assert len(original_matrices) == len(normalized_matrices) == len(labels), \
         "The number of original matrices, normalized matrices, and labels must be the same."
 
+    sns.set_context("paper", font_scale=1.2)
+    plt.rcParams.update({
+        "font.size": 14,
+        "axes.labelsize": 10,
+        "axes.titlesize": 14,
+        "legend.fontsize": 14,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    })
     # Prepare data for original distributions
     original_data = []
     for i, matrix in enumerate(original_matrices):
@@ -102,7 +192,7 @@ def visualize_comparison_multiple(
     normalized_df = pd.DataFrame(normalized_data, columns=["Value", "Institution"])
 
     # Initialize figure
-    plt.figure(figsize=(14, 6))
+    plt.figure(figsize=(8, 4))
 
     # Original data distribution with dual y-axis
     ax1 = plt.subplot(1, 2, 1)
@@ -127,14 +217,15 @@ def visualize_comparison_multiple(
         sns.kdeplot(
             subset,
             ax=ax1_2,
-            label=f"{label} (Density)",
+            # label=f"{label} (Density)",
             linestyle="--"
         )
-    ax1.set_title("Original Similarity Distribution")
-    ax1.set_xlabel("Value")
+    # ax1.set_title("Original Similarity Distribution")
+    ax1.set_xlabel("")
+    ax1.xaxis.set_label_coords(1, -0.1)
     ax1.set_ylabel("Frequency (Count)")
-    ax1_2.set_ylabel("Density")
-    ax1.legend(loc="upper left")
+    ax1_2.set_ylabel("")
+    ax1.legend(loc="upper right")
     if xlim_original:
         ax1.set_xlim(xlim_original)
 
@@ -164,19 +255,18 @@ def visualize_comparison_multiple(
             label=f"{label} (Density)",
             linestyle="--"
         )
-    ax2.set_title("Normalized Similarity Distribution")
-    ax2.set_xlabel("Value")
-    ax2.set_ylabel("Frequency (Count)")
-    ax2_2.set_ylabel("Density")
-    ax2.legend(loc="upper left")
+    # ax2.set_title("Normalized Similarity Distribution")
+    ax2.set_xlabel(" ")
+    ax1.xaxis.set_label_coords(0.5, -0.1)
+    ax2.set_ylabel("")
+    # ax2_2.set_ylabel("Density")
+    ax2.legend(loc="upper right")
     if xlim_normalized:
         ax2.set_xlim(xlim_normalized)
     plt.xlim(0, 1)
+    plt.subplots_adjust(wspace=0.3, hspace=0.3)
     # Save and show the plot
     plt.tight_layout()
-
-
-
     plt.savefig(os.path.join(RESULT_DIR, file_name), format='pdf')
 
 
@@ -208,7 +298,7 @@ def visualize_combined_matrices(distance_matrices, labels, file_name, bins=50):
     actual_min = combined_df["Value"].min()
     actual_max = combined_df["Value"].max()
 
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    fig, ax1 = plt.subplots(figsize=(5, 3))
 
     for label in labels:
         subset = combined_df[combined_df["Attribute"] == label]["Value"]
@@ -224,10 +314,10 @@ def visualize_combined_matrices(distance_matrices, labels, file_name, bins=50):
             ax=ax1
         )
 
-    ax1.set_xlabel("Distance Value")
+    ax1.set_xlabel(" ")
     ax1.set_ylabel("Frequency (Count)", color="black")
-    ax1.set_title("Distance Distribution")
-    ax1.legend(title="Attribute", loc="upper left")
+    ax1.set_title(" ")
+    ax1.legend( loc="upper left")
 
     ax2 = ax1.twinx()
 

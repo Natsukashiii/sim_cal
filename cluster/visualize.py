@@ -3,9 +3,10 @@ import numpy as np
 from apprise.plugins import sns
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS
-from cluster.distance import  cal_distance
-from sklearn.metrics import mean_squared_error
-from scipy.stats import spearmanr
+from cluster.distance import  cal_distance,cal_distance_multi_dimension
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
 
 from compute.compare_metric import cal_spearman,cal_gromov,cal_frobenius
 from utils.path import RESULT_DIR,PLOTS_DIR
@@ -90,52 +91,7 @@ def visualize_heatmap(similarity_matrices, labels, file_name, cmap="YlGnBu"):
     print(f"Heatmap saved to {output_path}")
 
 
-def visualize_one_matrix(matrix1, file_name,crop_ratio=None, min_val=0, max_val=1):
-    """
-    Visualize a single matrix as a histogram of its upper triangular values.
 
-    Args:
-        matrix1 (np.ndarray): Input square matrix to visualize.
-        crop_ratio (float): Optional crop ratio, included in the title if provided.
-        file_name (str): Output file name for the saved plot.
-        min_val (float): Minimum value for x-axis scaling.
-        max_val (float): Maximum value for x-axis scaling.
-    """
-    # Ensure inputs are square matrices
-    assert matrix1.shape[0] == matrix1.shape[1], "matrix1 must be a square matrix."
-
-    # Extract upper triangle data (excluding diagonal)
-    original_data = matrix1[np.triu_indices(matrix1.shape[0], k=1)]
-
-    # Create plot title
-    if crop_ratio:
-        original_title = f"Original({file_name}) - stretched {min_val:.4f} to {max_val:.4f} - (Total: {len(original_data)} - Crop ratio: {crop_ratio:.4f})"
-    else:
-        original_title = f"Original({file_name}) - stretched {min_val:.4f} to {max_val:.4f} - (Total: {len(original_data)})"
-
-    # Generate the plot
-    plt.figure(figsize=(10, 5))  # Adjust figure size for single plot
-    # Plot original data distribution
-    plt.hist(
-        original_data,
-        bins=80,
-        range=(min_val, max_val),
-        color="skyblue",
-        edgecolor="black",
-        alpha=0.7
-    )
-    plt.title(original_title, fontsize=12)
-    plt.xlabel("Origin al Values", fontsize=10)
-    plt.ylabel("Frequency", fontsize=10)
-
-    # Save and show the plot
-    plt.tight_layout()
-    plt.savefig(os.path.join(RESULT_DIR, file_name))
-
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 
 
 def visualize_comparison_multiple(
@@ -162,12 +118,12 @@ def visualize_comparison_multiple(
 
     sns.set_context("paper", font_scale=1.2)
     plt.rcParams.update({
-        "font.size": 14,
-        "axes.labelsize": 10,
-        "axes.titlesize": 14,
-        "legend.fontsize": 14,
-        "xtick.labelsize": 12,
-        "ytick.labelsize": 12
+        "font.size": 13,
+        "axes.labelsize": 13,
+        "axes.titlesize": 13,
+        "legend.fontsize": 13,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13
     })
     # Prepare data for original distributions
     original_data = []
@@ -192,7 +148,7 @@ def visualize_comparison_multiple(
     normalized_df = pd.DataFrame(normalized_data, columns=["Value", "Institution"])
 
     # Initialize figure
-    plt.figure(figsize=(8, 4))
+    plt.figure(figsize=(7, 4))
 
     # Original data distribution with dual y-axis
     ax1 = plt.subplot(1, 2, 1)
@@ -288,8 +244,8 @@ def visualize_combined_matrices(distance_matrices, labels, file_name, bins=50):
     for i, matrix in enumerate(distance_matrices):
         upper_triangle = matrix[np.triu_indices(matrix.shape[0], k=1)]
 
-        min_val, max_val = upper_triangle.min(), upper_triangle.max()
-        print(f"Matrix {labels[i]} - Min Value: {min_val:.6f}, Max Value: {max_val:.6f}")
+        # min_val, max_val = upper_triangle.min(), upper_triangle.max()
+        # print(f"Matrix {labels[i]} - Min Value: {min_val:.6f}, Max Value: {max_val:.6f}")
 
         combined_data.extend([(x, labels[i]) for x in upper_triangle])
 
@@ -342,125 +298,7 @@ def visualize_combined_matrices(distance_matrices, labels, file_name, bins=50):
     plt.savefig(os.path.join(RESULT_DIR, file_name), format='pdf')
 
 
-def visualize_two_compare_matrix(matrix1, matrix2,  crop_ratio, file_name,min_val=0, max_val=1,):
-    # Ensure inputs are square matrices
-    assert matrix1.shape[0] == matrix1.shape[1], "matrix1 must be a square matrix."
-    assert matrix2.shape[0] == matrix2.shape[1], "matrix2 must be a square matrix."
 
-    # Extract upper triangle data (excluding diagonal)
-    original_data = matrix1[np.triu_indices(matrix1.shape[0], k=1)]
-    transformed_data = matrix2[np.triu_indices(matrix2.shape[0], k=1)]
-
-    if crop_ratio:
-        original_title=f"Original({file_name}) - stretched {min_val:.4f} to {max_val} - (Total: {len(original_data)} - Crop ratio: {crop_ratio:.4f} )"
-    else:
-        original_title = f"Original({file_name}) - stretched {min_val:.4f} to {max_val} - (Total: {len(original_data)} )"
-
-    # generate the composed plots
-    plt.figure(figsize=(12, 6))
-
-    # Plot original data distribution
-    plt.subplot(1, 2, 1)
-    plot_data_distribution(
-        original_data,
-        bins=80,
-        min_value_x=min_val,
-        max_value_x=max_val,
-        title=original_title,
-        xlabel="Original Values"
-    )
-
-    # Plot transformed data distribution
-    plt.subplot(1, 2, 2)
-    plot_data_distribution(
-        transformed_data,
-        bins=80,
-        min_value_x=min_val,
-        max_value_x=max_val,
-        title=f"Transformed Sim ({file_name})",
-        xlabel="Transformed Values"
-    )
-
-    plt.subplots_adjust(wspace=0.6)  # Adjust spacing between plots
-    plt.savefig(os.path.join(RESULT_DIR, file_name))  # Save the plot
-
-def plot_data_distribution(data, bins, min_value_x, max_value_x, title, xlabel, ylabel="Frequency", color="skyblue", kde_color="orange", secondary_y_label="Density"):
-    """
-    Plot data distribution with histogram and KDE curve.
-
-    Parameters:
-        data (array-like): The data to plot.
-        bins (int): Number of bins for the histogram.
-        min_value_x (float): Minimum value of the x-axis.
-        max_value_x (float): Maximum value of the x-axis.
-        title (str): Title of the plot.
-        xlabel (str): Label for the x-axis.
-        ylabel (str): Label for the y-axis.
-    """
-    # Clean data: Remove NaNs and clip to range
-    data = np.asarray(data)
-    data = data[~np.isnan(data)]  # Remove NaNs
-    data = np.clip(data, min_value_x, max_value_x)  # Clip to specified range
-
-    # Compute histogram
-    hist_values, bin_edges = np.histogram(data, bins=bins, range=(min_value_x, max_value_x))
-
-    # Plot histogram
-    plt.bar(
-        (bin_edges[:-1] + bin_edges[1:]) / 2,
-        hist_values,
-        width=(bin_edges[1] - bin_edges[0]),
-        color=color,
-        alpha=0.7,
-        label="Histogram"
-    )
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel, color="black")
-    set_multiline_title(plt.gca(), title, max_line_length=40)
-
-    plt.xlim(min_value_x, max_value_x)
-    plt.legend(loc="upper left")
-
-    # Plot KDE
-    if kde_color is not None:
-        ax2 = plt.gca().twinx()  # Create a single secondary axis
-        sns.kdeplot(
-            data,
-            ax=ax2,
-            color=kde_color,
-            label="KDE (Density)",
-            linewidth=2,
-            bw_adjust=0.8  # Adjust bandwidth as needed
-        )
-        ax2.set_ylabel(secondary_y_label, color=kde_color)
-        ax2.tick_params(axis='y', labelcolor=kde_color)
-        ax2.legend(loc="upper right")
-        ax2.set_xlim(min_value_x, max_value_x)  # Ensure consistent x-limits
-
-    plt.tight_layout()
-
-def set_multiline_title(ax, title, max_line_length=60):
-    """
-    Set a multiline title for a plot.
-
-    Parameters:
-        ax (matplotlib.axes.Axes): The axes object to set the title on.
-        title (str): The title text.
-        max_line_length (int): The maximum length of each line.
-    """
-    if len(title) > max_line_length:
-        # Split the title into multiple lines
-        lines = []
-        while len(title) > max_line_length:
-            split_index = title[:max_line_length].rfind(' ')
-            if split_index == -1:
-                split_index = max_line_length
-            lines.append(title[:split_index])
-            title = title[split_index:].strip()
-        lines.append(title)
-        title = '\n'.join(lines)
-
-    ax.set_title(title)
 
 def visualize_cluster_results(distance_matrix, cluster_labels, repos, file_path):
     """
@@ -478,7 +316,7 @@ def visualize_cluster_results(distance_matrix, cluster_labels, repos, file_path)
 
     for i in range(num_repos):
         for j in range(num_repos):
-            composite_distances[i, j] = cal_distance(distance_matrix, i, j)
+            composite_distances[i, j] = cal_distance_multi_dimension(distance_matrix, i, j)
 
     # Step 2: Ensure the composite distances are symmetric
     composite_distances = (composite_distances + composite_distances.T) / 2
@@ -639,23 +477,4 @@ def visualize_silhouette_results(results, best_result, file_path):
 
     # Save the figure
     plt.savefig(file_path, dpi=300, bbox_inches='tight')
-
-def compute_t1_range_source(distance_matrix, num_steps=10):
-    """
-    Dynamically compute the T1 range based on the distance.py matrix.
-
-    Args:
-        distance_matrix (np.ndarray): The distance.py matrix.
-        num_steps (int): Number of steps for T1 values in the range.
-
-    Returns:
-        np.ndarray: The range of T1 values.
-    """
-    flattened_distances = distance_matrix[np.triu_indices_from(distance_matrix, k=1)]
-
-    min_distance = max(0.01, np.min(flattened_distances))
-    max_distance = np.mean(flattened_distances) + 3 * np.std(flattened_distances)  # Mean + 3*std deviation
-
-    t1_range = np.linspace(min_distance, max_distance, num_steps)
-    return t1_range
 

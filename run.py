@@ -6,13 +6,16 @@ import cluster.canopy
 import algori
 from algori import align, distance, combine
 from compute import overlap
-from cluster.distance import analysis_tuple_matrix
+from cluster.distance import analysis_tuple_matrix_multi_dimension
 from cluster.visualize import visualize_heatmap, visualize_combined_matrices, visualize_comparison_multiple
 from utils.file import save_all_results_to_csv
-from utils.config import load_attributes,load_normalize,load_integrate_level
+from utils.config import load_attributes,load_normalize,load_integrate_level_low,load_integrate_level_high,load_pick_repo_number
 
 # This number is used to pick the top N repositories from the similarity matrix for testing the function(to reduce the computation time)
-PICK_REPO_NUM = None
+#default None
+PICK_REPO_NUM = load_pick_repo_number()
+DIMENSION_LEVEL_LOW =load_integrate_level_low()
+DIMENSION_LEVEL_HIGH = load_integrate_level_high()
 GEN_HEATMAP = False
 
 def compare_multiple_attributes():
@@ -21,8 +24,6 @@ def compare_multiple_attributes():
     """
     print("-------------------------------------- 0. Load Config--------------------------------------")
     attributes = load_attributes()
-    integrate_level = load_integrate_level()
-    print(f"1. Attributes: {attributes}, integrate_level: {integrate_level}, PICK_REPO_NUM: {PICK_REPO_NUM}")
 
     print("-------------------------------------- 1. Load Similarity Data --------------------------------------")
     origin_sim_matrix_list =[]
@@ -45,8 +46,11 @@ def compare_multiple_attributes():
                                   labels=attributes,
                                   file_name="normalize_similarity.pdf")
     if GEN_HEATMAP:
-        visualize_heatmap(aligned_sim_matrix_list, attributes, "rq1_matrix_compare_before_normalize.pdf")
+        # visualize_heatmap(aligned_sim_matrix_list, attributes, "rq1_matrix_compare_before_normalize.pdf")
         visualize_heatmap(normalize_sim_matrix_list, attributes, "rq1_matrix_compare.pdf")
+        print("done")
+        return
+
     print("-------------------------------------- 4. Build Distance --------------------------------------")
     distance_matrix_map = {}
     for normalized_sim_matrix,reops, source in normalize_sim_matrix_list:
@@ -59,161 +63,88 @@ def compare_multiple_attributes():
         min,max,mean = align.get_min_max(distance_matrix)
         print(f"Source: {source}, Min: {min}, Max: {max}, Mean: {mean}")
 
+
     visualize_combined_matrices(
         list(distance_matrix_map.values()),
         attributes,
-        # list(distance_matrix_map.keys()),
         "normalize_distance.pdf"
     )
 
-    print("-------------------------------------- 5. Build Stretch --------------------------------------")
-    # Todo how to change the cluster numbers (by stretch distance) -> the distance is too small so the sillu is hard to control
-    # *10  （[logf(x+e)]-1）*10    # Todo how to change the cluster numbers (by stretch distance) -> the distance is too small so the sillu is hard to control
-    # this part can be deleted
+    print("-------------------------------------- 6. Generate Combinations --------------------------------------")
 
-
-    # distance_matrix_map_stretch = {}
-    # for source, distance_matrix in distance_matrix_map.items():
-    #     stretched_distance_matrix = align.distance_stretch(distance_matrix, source)
-    #     distance_matrix_map_stretch[source] = stretched_distance_matrix
-    #
-    # visualize_combined_matrices(
-    #     list(distance_matrix_map_stretch.values()),
-    #     attributes,
-    #     "normalize_distance_stretched.pdf"
-    # )
-    # distance_matrix_map=distance_matrix_map_stretch
-
-
-    print("-------------------------------------- 2. Generate Combinations --------------------------------------")
-    combinations = list(itertools.combinations(attributes, integrate_level))
+    combinations = []
+    for level in range(DIMENSION_LEVEL_LOW, DIMENSION_LEVEL_HIGH):  #enable multi dimension
+        combinations.extend(list(itertools.combinations(attributes, level)))
     print(f"Generated combinations: {combinations}")
-    results = []
+
+
+    print("-------------------------------------- 6. Generate Combinations Matrix --------------------------------------")
+    combinations_distance_dict = {}
 
     for combination in combinations:
-        print("-------------------------------------- 2. Calculation --------------------------------------")
-        print(f"Processing combination: {combination}")
-        selected_matrices = [distance_matrix_map[attr] for attr in combination]
+        if len(combination) == 1:
+            single_distance_matrix = distance_matrix_map[combination[0]]
+            combinations_distance_dict[combination] = single_distance_matrix
+            print(f"Single attribute {combination} added directly.")
+        else:
+            selected_matrices = [distance_matrix_map[attr] for attr in combination]
+            combine_distance_matrix = combine.combine_multi_dimension(*selected_matrices, common_repos=common_repos)
+            combine_min, combine_mean, combine_max = analysis_tuple_matrix_multi_dimension(combine_distance_matrix)
+            print(f"Combine {combination} completed: distance: np.min={combine_min}, np.mean = {combine_mean}, np.max = {combine_max}")
+            combinations_distance_dict[combination] = combine_distance_matrix
 
-        combine_distance_matrix = combine.combine(selected_matrices[0],selected_matrices[1], common_repos)
-        combine_min, combine_mean, combine_max = analysis_tuple_matrix(combine_distance_matrix)
-        print(f"Combine distance:np.min={combine_min}, np.mean = {combine_mean}, np.max = {combine_max}")
-        print(f"Combining attributes {combination} completed.")
+    print("-------------------------------------- 6. Generate Cluster Result --------------------------------------")
+    combinations_cluster_result_dict = {}
 
-        for source in combination:
-            print(f"Comparing combined matrix with attribute: {source}")
+    for combination in combinations:
+        combine_name = "_".join(combination) if len(combination) > 1 else combination[0]
+        selected_distance_matrix = combinations_distance_dict.get(combination)
+        if combine_distance_matrix is None:
+            print(f"Warning: No distance matrix found for {combination}, skipping...")
+            continue
+        cluster_result = cluster.canopy.canopy_clustering_multi_dimension(selected_distance_matrix, common_repos,
+                                                                          combine_name)
+        combinations_cluster_result_dict[combination] = cluster_result
+    print("-------------------------------------- 6. Calculate overlap Ratio --------------------------------------")
 
-            single_distance_matrix = distance_matrix_map[source]
+    for base in combinations:
+        base_distance_matrix = combinations_distance_dict[base]
+        base_cluster_result = combinations_cluster_result_dict[base]
 
-            single_cluster_result = cluster.canopy.canopy_clustering(single_distance_matrix, common_repos, source, False)
-            combined_cluster_result = cluster.canopy.canopy_clustering(combine_distance_matrix, common_repos, "Combined", True)
+        for other in combinations:
+            if base == other:
+                continue
 
-            overlap_ratio, filtered_overlap_ratio = overlap.cal_overlap(single_distance_matrix, single_cluster_result,
-                                                                         combined_cluster_result, common_repos)
+            if not (set(base).issubset(set(other)) or set(other).issubset(set(base))):
+                continue
 
-            print(f">>>> Overlap ratio (Combined vs {source}): {overlap_ratio}")
+            other_distance_matrix = combinations_distance_dict[other]
+            other_cluster_result = combinations_cluster_result_dict[other]
 
-            results.append({
-                "combination": combination,
-                "compared_with": source,
+            overlap_ratio, filtered_overlap_ratio = overlap.cal_overlap(
+                base_distance_matrix, base_cluster_result,
+                other_cluster_result, common_repos
+            )
+
+            print(f">>>> Overlap ratio ({base} vs {other}): {overlap_ratio}")
+
+            result = {
+                "base": base,
+                "base_silhouette": base_cluster_result["best_silhouette"],
+                "base_cluster_size": base_cluster_result["best_cluster_nums"],
+                "compared_with": other,
+                "compared_with_silhouette": other_cluster_result["best_silhouette"],
+                "compared_cluster_size": other_cluster_result["best_cluster_nums"],
                 "overlap_ratio": overlap_ratio
-                # "filtered_overlap_ratio": filtered_overlap_ratio
-            })
+            }
 
+            print(f">>>>>>>>>>>>>>>>>>>>>>>>  {base} + {other} overlap ratio: {overlap_ratio}")
+
+            save_all_results_to_csv(result)
     print("-------------------------------------- Finished --------------------------------------")
-    save_all_results_to_csv(results)
-    return results
 
 
 
-def compare_two_attributes(source1,source2):
-    print("-------------------------------------- 0. Load Config--------------------------------------")
-    normalize = load_normalize()
-    # This number is used to pick the top N repositories from the similarity matrix for testing the function(to reduce the computation time)
-    print(f"1. Normalize: {normalize}")
 
-
-    print("-------------------------------------- 1. Load Similarity Data --------------------------------------")
-    matrix1, repos1 = extract.load_data(source1)
-    matrix2, repos2 = extract.load_data(source2)
-    origin_sim_matrix_list = [
-        (matrix1, repos1,source1),
-        (matrix2, repos2,source2),
-    ]
-    print(f"2. Similarity Data for {source1} and {source2} loaded")
-
-    print("-------------------------------------- 2. Data preprocess --------------------------------------")
-    aligned_sim_matrix_list, common_repos = algori.align.align_list(origin_sim_matrix_list, PICK_REPO_NUM)
-    aligned_sim_matrix_1, repo_list_1,source1= aligned_sim_matrix_list[0]
-    aligned_sim_matrix_2, repo_list_2,source2 = aligned_sim_matrix_list[1]
-    print(f"3. Picked {PICK_REPO_NUM} repositories for comparison, align repos to {len(common_repos)}")
-    # Todo Is there a better way to do this?
-    processed_sim_matrix1 = aligned_sim_matrix_1
-    processed_sim_matrix1 = aligned_sim_matrix_2
-
-    print("-------------------------------------- 3. Data Normalization --------------------------------------")
-    if normalize:
-        normalized_sim_matrix_1, min_1, max_1, crop_ratio1 = align.stretch(aligned_sim_matrix_1, source1)
-        normalized_sim_matrix_2, min_2, max_2, crop_ratio2 = align.stretch(aligned_sim_matrix_2, source2)
-        visualize_comparison_multiple(
-            original_matrices=[
-                aligned_sim_matrix_1,
-                aligned_sim_matrix_2,
-            ],
-            normalized_matrices=[
-                normalized_sim_matrix_1,
-                normalized_sim_matrix_2,
-            ],
-            labels=[f"Attribute-1{source1}", f"Attribute-2{source2}"],
-            file_name="normalize_similarity.pdf"
-        )
-
-        # Todo
-        processed_sim_matrix1 = normalized_sim_matrix_1
-        processed_sim_matrix2 = normalized_sim_matrix_2
-
-
-    print("-------------------------------------- 4. Build Distance --------------------------------------")
-
-    distance_matrix_1 = algori.distance.build_distance_matrix(processed_sim_matrix1)
-    distance_matrix_2 = algori.distance.build_distance_matrix(processed_sim_matrix2)
-    min1, max1, mean1 = align.get_min_max(distance_matrix_1)
-    min2, max2, mean2 = align.get_min_max(distance_matrix_2)
-    print(f"Origin distance1:np.min besides 0: {min1}, np.mean = {mean1}, np.max = {max1}")
-    print(f"Origin distance2:np.min besides 0: {min2}, np.mean = {mean2}, np.max = {max2}")
-    visualize_combined_matrices(
-        distance_matrices=[distance_matrix_1, distance_matrix_2],
-        labels=[f"Attribute-1{source1}", f"Attribute-2{source2}"],
-        file_name="normalize_distance.pdf"
-    )
-
-
-    print("-------------------------------------- 5. Combine --------------------------------------")
-    combine_distance_matrix = combine.combine(distance_matrix_1, distance_matrix_2, common_repos)
-    combine_min, combine_mean, combine_max = analysis_tuple_matrix(combine_distance_matrix)
-    print(f"Combine distance:np.min={combine_min}, np.mean = {combine_mean}, np.max = {combine_max}")
-
-
-    print("-------------------------------------- 6. Cluster --------------------------------------")
-
-    source1_cluster_result = cluster.canopy.canopy_clustering(distance_matrix_1, common_repos, source1, False)
-    source2_cluster_result = cluster.canopy.canopy_clustering(distance_matrix_2, common_repos, source2, False)
-    combine_cluster_result = cluster.canopy.canopy_clustering(combine_distance_matrix, common_repos, "combine", True)
-
-    print("-------------------------------------- 7. Computing --------------------------------------")
-    # compute
-    overlap_ratio, filtered_overlap_ratio1 = overlap.cal_overlap(distance_matrix_1, source1_cluster_result,
-                                                                 combine_cluster_result,
-                                                                 common_repos)
-    # overlap_ratio2 = overlap.cal_overlap(distance_matrix_2, combine_cluster_result, distance_matrix_1,
-    #                                      source_cluster_result, common_repos)
-    print(f"overlap_ratio={overlap_ratio}")
-    print(f"Filtered overlap_ratio={filtered_overlap_ratio1}")
-    # print(f"overlap_ratio2={overlap_ratio2}")
-    print("-------------------------------------- Finished --------------------------------------")
-    return overlap_ratio
-
-
-# compare_two_attributes("mudablue","crosssim")
 compare_multiple_attributes()
 

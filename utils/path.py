@@ -8,14 +8,19 @@ PROJECT_DIR = CURRENT_DIR.parent
 
 INPUT_DIR = PROJECT_DIR/'input'
 RESULT_DIR = PROJECT_DIR/'0_result'
+PLOTS_DIR= PROJECT_DIR/'1_plots'
 
+REPOS_FILE_PATH = "input/repos.txt"
 
 ##baseline data
-BASELINE_DIR = PROJECT_DIR/'project_sibling_update'
-BASELINE_REPOPAL = BASELINE_DIR/'baseline_output'/'repopal'
-BASELINE_MUDABLUE = BASELINE_DIR/'baseline_output'/'mudablue'
-BASELINE_CROSSSIM = BASELINE_DIR/'baseline_output'/'crosssim'
-BASELINE_CROSSSIM_GRAPH =  BASELINE_DIR / 'dataset'/'crosssim'/'graph'
+BASELINE_DIR = Path("/repos/")
+DATASET_DIR = BASELINE_DIR / 'dataset' / 'crosssim_repos'
+
+TOOL_RESULT_DIR = BASELINE_DIR /'tools'
+REPOPAL_RESULT = TOOL_RESULT_DIR/ 'repopal' / 'result'
+CROSSSIM_RESULT = TOOL_RESULT_DIR/'crosssim' / 'result'
+MUDABLUE_RESULT = TOOL_RESULT_DIR/'mudablue' / 'result'
+
 
 
 print(f"CURRENT_DIR: {CURRENT_DIR}")

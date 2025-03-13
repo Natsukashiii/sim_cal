@@ -2,7 +2,7 @@ import os.path
 from collections import defaultdict
 import numpy as np
 from utils.path import RESULT_DIR
-from cluster.distance import cal_distance
+from cluster.distance import cal_distance,cal_distance_multi_dimension
 
 COMPUTE_BASED_ON_ORIGIN = True
 
@@ -40,22 +40,14 @@ def cal_overlap(distance_matrix1,source1_cluster_result, combine_cluster_result,
     labelA_to_centroid = {}
     for label_A, repos_in_A in cluster_A.items():
         if repos_in_A:
-            labelA_to_centroid[label_A] = find_centroid(repos_in_A, distance_matrix, repos)
+            labelA_to_centroid[label_A] = find_centroid_multi_dimension(repos_in_A, distance_matrix, repos)
 
     labelC_to_centroid = {}
     for label_C, repos_in_C in cluster_C.items():
         if repos_in_C:
-            labelC_to_centroid[label_C] = find_centroid(repos_in_C, distance_matrix, repos)
+            labelC_to_centroid[label_C] = find_centroid_multi_dimension(repos_in_C, distance_matrix, repos)
 
-################################################################################################
     # Step 3: Map LabelC clusters to LabelA clusters using centroids
-    # labelC_to_labelA = {}
-    # for label_C, centroid_repo in labelC_to_centroid.items():
-    #     for label_A, repos_in_A in cluster_A.items():
-    #         if centroid_repo in repos_in_A:
-    #             labelC_to_labelA[label_C] = label_A
-    #             break
-    ################################################################################################
     labelC_to_labelA = {}
     for label_C, centroid_C_repo in labelC_to_centroid.items():
         min_distance = float('inf')
@@ -67,31 +59,14 @@ def cal_overlap(distance_matrix1,source1_cluster_result, combine_cluster_result,
             centroid_A_index = repos.index(centroid_A_repo)
 
             # Calculate the distance between the two centroids
-            distance = cal_distance(distance_matrix, centroid_C_index, centroid_A_index)
+            distance = cal_distance_multi_dimension(distance_matrix, centroid_C_index, centroid_A_index)
             if distance < min_distance:
                 min_distance = distance
                 closest_label_A = label_A
 
         if closest_label_A is not None:
             labelC_to_labelA[label_C] = closest_label_A
-    ################################################################################################
-    # labelC_to_labelA = {}
-    # for label_C, centroid_repo in labelC_to_centroid.items():
-    #     min_distance = float('inf')
-    #     closest_label_A = None
-    #     repos_list = list(repos)
-    #
-    #     for label_A, repos_in_A in cluster_A.items():
-    #         for repo in sorted(repos_in_A):
-    #             centroid_index = repos_list.index(centroid_repo)
-    #             repo_index = repos_list.index(repo)
-    #             distance = cal_distance(distance_matrix, centroid_index, repo_index)
-    #             if distance < min_distance:
-    #                 min_distance = distance
-    #                 closest_label_A = label_A
-    #     if closest_label_A is not None:
-    #         labelC_to_labelA[label_C] = closest_label_A
-    ################################################################################################
+
 
     # Step 4: Calculate overlap for each LabelA cluster
     all_overlap_details = []
@@ -159,14 +134,14 @@ def cal_overlap(distance_matrix1,source1_cluster_result, combine_cluster_result,
 
 
 
-def find_centroid(cluster, distance_matrix, repos):
+def find_centroid_multi_dimension(cluster, distance_matrix, repos):
     """
-    Find the centroid of a cluster using the distance.py matrix.
+    Find the centroid of a cluster using the distance matrix.
 
     Args:
         cluster (set): Repositories in the cluster.
         distance_matrix (np.ndarray): Distance matrix of all repos.
-        repos (List[str] or Set[str]): List or set of repository names corresponding to the distance.py matrix.
+        repos (List[str] or Set[str]): List or set of repository names corresponding to the distance matrix.
 
     Returns:
         str: Repository that is closest to the centroid.
@@ -176,10 +151,8 @@ def find_centroid(cluster, distance_matrix, repos):
         repos = list(repos)
         repos = sorted(repos)
 
-    # ensure the cluster is sorted so evertime the centroid is the same
+    # Ensure cluster is sorted so every time the centroid is the same
     cluster = sorted(cluster)
-    # Ensure cluster is a list to use indices
-    cluster = list(cluster)
 
     # Get the indices of the repos in the cluster
     indices = [repos.index(repo) for repo in cluster if repo in repos]
@@ -190,30 +163,50 @@ def find_centroid(cluster, distance_matrix, repos):
 
     # Extract the submatrix for the cluster
     submatrix = distance_matrix[np.ix_(indices, indices)]
+    submatrix=process_submatrix(submatrix)
 
-    #### ----
+    if isinstance(submatrix[0, 0], (tuple, list, np.ndarray)):
+        submatrix = np.sqrt(np.sum(np.square(submatrix), axis=-1))
 
-    # Compute the mean distance to all other points for each repo in the cluster
-    mean_distances = np.round(submatrix.mean(axis=1), decimals=8)
-    min_distance = mean_distances.min()
+    mean_distances = np.mean(submatrix, axis=1)
+    min_distance = np.min(mean_distances)
 
-    # Handle ties (multiple points with the same minimum mean distance)
-    # Find all candidates with the minimum mean distance
     candidates = [
-        (cluster[i], mean_distances[i])  # Store both repo and its mean distance
-        for i, d in enumerate(mean_distances) if abs(d - min_distance) < 1e-9
+        (cluster[i], mean_distances[i])
+        for i in range(min(len(cluster), len(mean_distances))) if np.isclose(mean_distances[i], min_distance)
     ]
 
-    # Sort candidates by repo name (to ensure consistent selection)
-    candidates = sorted(candidates, key=lambda x: x[0])  # Sort by repo name (alphabetically)
+    if not candidates:
+        min_index = np.argmin(mean_distances)
 
-    # Return the first candidate's repo
+        # **Debugging prints**
+        print(f"Debug: cluster={cluster}")
+        print(f"Debug: min_index={min_index}")
+        print(f"Debug: mean_distances={mean_distances}")
+
+        if min_index >= len(cluster):
+            print(f"Error: min_index ({min_index}) exceeds cluster length ({len(cluster)})")
+            return None
+        return cluster[min_index]
+
+
+    candidates = sorted(candidates, key=lambda x: x[0])
     return candidates[0][0]
 
 
+def process_submatrix(submatrix):
+    """
+    Convert submatrix from object dtype to numerical dtype.
 
-    # # Compute the mean distance.py to all other points for each repo in the cluster
-    # centroid_index = submatrix.mean(axis=1).argmin()
-    #
-    # # Return the repo corresponding to the centroid
-    # return cluster[centroid_index]
+    Args:
+        submatrix (np.ndarray): Input matrix, may contain tuples.
+
+    Returns:
+        np.ndarray: Processed matrix with numerical dtype.
+    """
+    submatrix = np.array(submatrix)
+
+    if submatrix.dtype == object:
+        submatrix = np.array([[np.array(x, dtype=np.float64) for x in row] for row in submatrix])
+
+    return submatrix

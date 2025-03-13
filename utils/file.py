@@ -1,3 +1,5 @@
+import pandas as pd
+
 from utils.path import RESULT_DIR
 import os
 import csv
@@ -31,22 +33,40 @@ def save_all_results_to_csv(results, filename="results.csv"):
     Save results to a CSV file.
 
     Args:
-        results (list of dict): List containing dictionaries with results data.
+        results (list of dict) or (dict): List containing dictionaries with results data.
         filename (str): Name of the output CSV file.
     """
     if not results:
         print("No results to save.")
         return
 
+    if isinstance(results, dict):
+        results = [results]
+
     file_path = os.path.join(RESULT_DIR, filename)
 
-    # Define CSV column headers based on keys in the dictionary
+    is_new_file = not os.path.exists(file_path)
+
     fieldnames = results[0].keys()
 
-    # Write to CSV file
-    with open(file_path, mode="w", newline="", encoding="utf-8") as file:
+    with open(file_path, mode="a", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()  # Write column headers
-        writer.writerows(results)  # Write data rows
+
+        if is_new_file:
+            writer.writeheader()
+
+        writer.writerows(results)
 
     print(f"Results saved to {filename}")
+
+def save_cluster_results_to_csv(result, filename):
+    """
+    Save clustering results to a CSV file to avoid redundant computation.
+
+    Args:
+        result (dict): Clustering results dictionary.
+        filename (str): Output file name.
+    """
+    result_df = pd.DataFrame([result])
+    result_df.to_csv(filename, index=False)
+    print(f"Clustering results saved to {filename}")

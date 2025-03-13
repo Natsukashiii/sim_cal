@@ -20,7 +20,6 @@ def cal_distance(distance_matrix, i, j):
 
     if distance_matrix.ndim == 2 and not isinstance(distance_matrix[0, 0], (tuple, list)):
         # Case 1: One-dimensional distance (scalar values in the matrix)
-        # 控制精度
         distance_matrix = np.round(np.array(distance_matrix), decimals=8)
 
         return distance_matrix[i, j]
@@ -30,21 +29,7 @@ def cal_distance(distance_matrix, i, j):
         Da_ij, Db_ij = distance_matrix[i, j]  # Extract (Da_ij, Db_ij)
         weights = [1,1]
         w_a, w_b = weights
-
-        # if w_a==1:
-        #     distance = Da_ij
-        # elif w_b==1:
-        #     distance = Db_ij
-        # else:
-        # distance = w_a * abs(Da_ij) + w_b * abs(Db_ij)
         distance = np.sqrt(w_a * Da_ij ** 2 + w_b * Db_ij ** 2)
-
-        # distance = np.sqrt(w_a * Da_ij ** 2 + w_b * Db_ij ** 2)
-
-        #---
-        # magnitude_a = np.sqrt(Da_ij ** 2 + Db_ij ** 2)
-        # cos_theta = Da_ij / magnitude_a if magnitude_a != 0 else 0
-        # distance = magnitude_a * (1 - cos_theta)
 
         return distance
 
@@ -53,16 +38,72 @@ def cal_distance(distance_matrix, i, j):
         raise ValueError("Unsupported distance matrix format. Matrix must be 2D or 3D with shape (N, N, 2).")
 
 
-def analysis_tuple_matrix(combine_distance_matrix):
-    # Extract upper triangle indices (excluding diagonal)
-    print(f"Type =  {type(combine_distance_matrix)} ")
+def cal_distance_multi_dimension(distance_matrix, i, j, weights=None):
+    """
+    Efficiently calculate multi-dimensional distance between two points (i, j).
+
+    Args:
+        distance_matrix (np.ndarray): The distance matrix.
+        i (int): Index of the first point.
+        j (int): Index of the second point.
+        weights (list or np.ndarray, optional): Weights for each dimension.
+
+    Returns:
+        float: Computed distance.
+    """
+    distance_matrix = np.asarray(distance_matrix)  # Convert to NumPy array if not already
+    weights = np.ones(distance_matrix.shape[-1]) if weights is None else np.asarray(weights)
+    values = np.array(distance_matrix[i, j])
+
+    if distance_matrix.ndim == 2 and not isinstance(distance_matrix[0, 0], (tuple, list)):
+        # Case 1: One-dimensional distance (scalar values in the matrix)
+        return distance_matrix[i, j]
+
+    elif len(values) == 2 and isinstance(distance_matrix[0, 0], (tuple, list)):
+        Da_ij, Db_ij = distance_matrix[i, j]  # Extract (Da_ij, Db_ij)
+        weights = [1, 1]
+        w_a, w_b = weights
+        distance = np.sqrt(w_a * Da_ij ** 2 + w_b * Db_ij ** 2)
+
+        return distance
+    elif len(values) == 3 and isinstance(distance_matrix[0, 0], (tuple, list)):
+        num_dims = len(values)
+
+        Da_ij, Db_ij,Dc_ij = distance_matrix[i, j]  # Extract (Da_ij, Db_ij)
+        weights = [1, 1,1]
+        w_a, w_b,w_c = weights
+        distance = np.sqrt(w_a * Da_ij ** 2 + w_b * Db_ij ** 2+w_c * Dc_ij ** 2)
+
+        return distance
+
+
+    else:
+        raise ValueError("Unsupported distance matrix format. ")
+
+
+def analysis_tuple_matrix_multi_dimension(combine_distance_matrix):
+    """
+    Analyze a combined distance matrix (supporting 1D, 2D, 3D, and N-dimensional data).
+
+    Args:
+        combine_distance_matrix (np.ndarray): A matrix where each entry is an N-dimensional tuple or scalar.
+
+    Returns:
+        tuple: (min_distance, mean_distance, max_distance)
+    """
     n = combine_distance_matrix.shape[0]
     distances = []
 
     for i in range(n):
         for j in range(i + 1, n):  # Exclude diagonal
-            a, b = combine_distance_matrix[i, j]  # Extract tuple (a, b)
-            euclidean_distance = np.sqrt(a**2 + b**2)  # Compute Euclidean distance
+            values = combine_distance_matrix[i, j]  # Extract value (could be tuple or scalar)
+
+            # Handle single-dimensional case
+            if isinstance(values, (int, float, np.float32, np.float64)):
+                euclidean_distance = abs(values)  # 1D case
+            else:
+                euclidean_distance = np.sqrt(sum(x ** 2 for x in values))  # Multi-dimensional case
+
             distances.append(euclidean_distance)
 
     # Convert list to NumPy array for statistical operations
@@ -72,31 +113,6 @@ def analysis_tuple_matrix(combine_distance_matrix):
     combine_min = np.min(distances)
     combine_mean = np.mean(distances)
     combine_max = np.max(distances)
-    return combine_min,combine_mean,combine_max
 
-
-def print_value_ratios(distance_matrix, intervals=10):
-    flattened_values = distance_matrix.flatten()
-
-    min_value = np.min(flattened_values)
-    max_value = np.max(flattened_values)
-    interval_bounds = np.linspace(min_value, max_value, intervals + 1)
-
-    counts = np.zeros(intervals, dtype=int)
-    for i in range(intervals):
-        lower_bound = interval_bounds[i]
-        upper_bound = interval_bounds[i + 1]
-        if i == intervals - 1:
-            counts[i] = np.sum((flattened_values >= lower_bound) & (flattened_values <= upper_bound))
-        else:
-            counts[i] = np.sum((flattened_values >= lower_bound) & (flattened_values < upper_bound))
-
-    total_count = len(flattened_values)
-    ratios = counts / total_count
-
-    print(f"Total values: {total_count}")
-    for i in range(intervals):
-        lower_bound = interval_bounds[i]
-        upper_bound = interval_bounds[i + 1]
-        print(f"Interval {i + 1} [{lower_bound:.4f}, {upper_bound:.4f}]: Count = {counts[i]}, Ratio = {ratios[i]:.4%}")
+    return combine_min, combine_mean, combine_max
 

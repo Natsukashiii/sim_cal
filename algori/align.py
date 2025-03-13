@@ -5,45 +5,8 @@ import numpy as np
 import pandas as pd
 
 
-def normalize(data, log_transform=False, feature_range=(0, 1)):
-    """
-    Scale input data to ensure balanced and uniform transformation.
 
-    Args:
-        data: np.ndarray or pd.DataFrame
-            Input data to be scaled.
-        log_transform: bool, optional
-            If True, apply logarithmic transformation to handle skewed data.
-        feature_range: tuple, optional
-            Desired range for MinMaxScaler.
-
-    Returns:
-        pd.DataFrame: Scaled data.
-    """
-    # Step 1: Ensure input is a DataFrame
-    if isinstance(data, np.ndarray):
-        data = pd.DataFrame(data)
-
-    # Step 2: Replace NaN values with 0
-    data = data.fillna(0)
-
-    # Step 3: Adaptive clipping to retain broader range
-    lower_bound = np.percentile(data, 2)  # Use 1st percentile for lower bound
-    upper_bound = np.percentile(data, 99)  # Use 99th percentile for upper bound
-    data_clipped = np.clip(data, lower_bound, upper_bound)
-
-    # Step 4: Optional logarithmic transformation
-    if log_transform:
-        data_clipped = np.log1p(data_clipped - data_clipped.min().min() + 1e-6)
-
-    # Step 5: Scale data to [0, 1] using MinMaxScaler
-    scaler = MinMaxScaler(feature_range=feature_range)
-    scaled_data = scaler.fit_transform(data_clipped)
-
-    return scaled_data
-
-
-def stretch(original_matrix, source_name, crop_ratio=0):
+def stretch(original_matrix, source_name):
     if isinstance(original_matrix, pd.DataFrame):
         original_matrix = original_matrix.to_numpy()
 
@@ -56,23 +19,6 @@ def stretch(original_matrix, source_name, crop_ratio=0):
     return reshaped_original_matrix, min_val, max_val, crop_ratio
 
 
-def distance_stretch(original_matrix, source_name):
-    """
-    y = (log(f(x) + 1) - 1) * 10
-    f(x) = original_matrix + 1，
-    """
-    if isinstance(original_matrix, pd.DataFrame):
-        original_matrix = original_matrix.to_numpy()
-
-    adjusted_matrix = original_matrix +(np.e)
-    stretched_matrix = (np.log(adjusted_matrix)-1) * 10
-
-    # adjusted_matrix = original_matrix +1
-    # stretched_matrix = (np.log(adjusted_matrix)) * 10
-
-    print(f"[{source_name}] Distance Stretch Applied: Min={np.min(stretched_matrix)}, Max={np.max(stretched_matrix)}, Mean={np.mean(stretched_matrix)}")
-
-    return stretched_matrix
 
 def reshape_matrix(original_data, matrix_size):
     """
@@ -93,7 +39,6 @@ def reshape_matrix(original_data, matrix_size):
     # upper side
     indices = np.triu_indices(matrix_size, k=1)
     reshaped_original_matrix[indices] = original_data
-
     reshaped_original_matrix += reshaped_original_matrix.T
 
     return reshaped_original_matrix
@@ -120,21 +65,21 @@ def stretch_to_zscore(data, use_log=False, iqr_multiplier=1.5, non_linear_mappin
     """
     # Step 1: Filter out non-positive values for analysis
     # non_zero_data = data[data > 0]
-    non_zero_data = data - data.min() + 1e-6
+    # non_zero_data = data - data.min() + 1e-6
 
     if verbose:
-        print_stats("Before Cropping", non_zero_data)
+        print_stats("Before Cropping", data)
 
     # Step 2: Calculate IQR bounds
-    Q1, Q3 = np.percentile(non_zero_data, [10, 90])
+    Q1, Q3 = np.percentile(data, [10, 90])
     IQR = Q3 - Q1
     lower_bound = Q1 - iqr_multiplier * IQR
     upper_bound = Q3 + iqr_multiplier * IQR
 
     # Step 3: Clip data to IQR bounds (instead of removing outliers, clip them to bounds)
-    num_cropped = np.sum((non_zero_data < lower_bound) | (non_zero_data > upper_bound))
-    crop_ratio_actual = num_cropped / len(non_zero_data)
-    cropped_data = np.clip(non_zero_data, lower_bound, upper_bound)  # Clip to bounds
+    num_cropped = np.sum((data < lower_bound) | (data > upper_bound))
+    crop_ratio_actual = num_cropped / len(data)
+    cropped_data = np.clip(data, lower_bound, upper_bound)  # Clip to bounds
     # cropped_data = non_zero_data  # Clip to bounds
 
     if verbose:
@@ -171,19 +116,6 @@ def stretch_to_zscore(data, use_log=False, iqr_multiplier=1.5, non_linear_mappin
 
     return normalized_data, min_val, max_val, crop_ratio_actual
 
-def plot_distribution(data, title="Data Distribution"):
-    """
-    Plot the histogram and density plot of the data.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.hist(data, bins=50, density=True, alpha=0.6, color="blue", label="Histogram")
-    plt.axvline(data.mean(), color="red", linestyle="--", label=f"Mean: {data.mean():.2f}")
-    plt.axvline(data.std(), color="green", linestyle="--", label=f"Std: {data.std():.2f}")
-    plt.title(title)
-    plt.xlabel("Value")
-    plt.ylabel("Density")
-    plt.legend()
-    plt.show()
 
 def print_stats(step, data, crop_ratio=None):
     """
@@ -255,8 +187,6 @@ def align_single(similarity_matrix: np.ndarray, repos: List[str], common_repos: 
 
     size = len(aligned_repos)
     aligned_matrix = np.zeros((size, size))
-    # print(f"common_repos: {len(common_repos)}, repos: {len(repos)}")
-    # print(f"aligned_repos: {len(aligned_repos)}")
 
     for i, repo_i in enumerate(aligned_repos):
         for j, repo_j in enumerate(aligned_repos):

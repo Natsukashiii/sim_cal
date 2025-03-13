@@ -14,7 +14,7 @@ def load_pick_repo_number():
         return None
     return load_config_value("pick_repo_num", default_value=300, expected_type=int)
 def load_num_steps():
-    return load_config_value("num_steps", default_value=100, expected_type=int)
+    return load_config_value("t1_range_steps", default_value=20, expected_type=int)
 
 def load_normalize():
     return load_config_value("normalize", default_value=True, expected_type=bool)

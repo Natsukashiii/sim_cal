@@ -1,23 +1,18 @@
 {
-  "custom_attributes":["crosssim", "repopal", "mudablue"],
-
-  "normalize":true,
-
-  "integrate_level_low":1,
-  "integrate_level_high":4,
-
-
-  "pick_repo_num": 0,
-
-
-  "t1_range_steps":20
-
-
-
-
-
-
-
-
-
+  "custom_attributes": [
+    "crosssim",
+    "repopal",
+    "mudablue",
+    "build"
+  ],
+  "eva_attributes": [
+    "crosssim",
+    "repopal",
+    "mudablue",
+    "build_eva"
+  ],
+  "normalize": true,
+  "integrate_level_low": 1,
+  "integrate_level_high": 4,
+  "pick_repo_num": 80
 }

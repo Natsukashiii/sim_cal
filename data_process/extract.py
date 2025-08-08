@@ -1,16 +1,38 @@
 
 import os
 import pickle
-from typing import re
 import re
+
 import numpy as np
 import pandas as pd
-from utils.path import CROSSSIM_RESULT,REPOPAL_RESULT,MUDABLUE_RESULT,INPUT_DIR,REPOPAL_RESULT
-from data_process.mock import mock_sim1,mock_sim2,mock_sim3,mock_sim4,mock_sim5
+
+from data_process.mock import (mock_sim1, mock_sim2, mock_sim3, mock_sim4,
+                               mock_sim5)
+from utils.path import (CROSSSIM_RESULT, EVA_BUILD_RESULT, EVA_CROSSSIM_RESULT,
+                        EVA_MUDABLUE_RESULT, EVA_REPOPAL_RESULT, INPUT_DIR,
+                        MUDABLUE_RESULT, REPOPAL_RESULT)
 
 
+def load_eva_data(source_name):
+    extract_funcs = {
+        'crosssim': extract_crosssim,
+        'repopal': extract_repopal,
+        'mudablue': extract_mudablue,
+    }
+    if source_name == 'build_eva':
+        df = pd.read_csv(EVA_BUILD_RESULT / "build_eva.csv", index_col=0)
+        matrix = df.values
+        repos = df.index.tolist()
+    elif source_name in extract_funcs:
+        df = extract_funcs[source_name](True)
+        matrix, repos = build_similarity_matrix(df)
+        matrix = clean_matrix(matrix)
+    else:
+        raise ValueError(f"Unsupported data source: {source_name}")
 
-def load_data(source_name, random_seed = 42):
+    return matrix, repos
+
+def load_data(source_name):
     similarity_file_path = os.path.join(INPUT_DIR, f"{source_name}.csv")
     repos_file_path = REPOPAL_RESULT
 
@@ -58,7 +80,6 @@ def load_data(source_name, random_seed = 42):
     else:
         print(f"Repos file already exists at {repos_file_path}. Skipping save.")
 
-    embeddings = None
     matrix = clean_matrix(matrix)
     return matrix, repos
 
@@ -66,12 +87,11 @@ def load_data(source_name, random_seed = 42):
 def clean_matrix(matrix):
     # Ensure the input numpy array
     matrix = np.array(matrix, dtype=float)
-    # replace NaN and inf to 0
+    # remove NaN
     matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
     return matrix
 
 def build_similarity_matrix(df):
-
     repos = sorted(set(df['repo1']).union(set(df['repo2'])))
     repo_to_index = {repo: idx for idx, repo in enumerate(repos)}
 
@@ -96,20 +116,21 @@ def build_similarity_matrix(df):
 
     return similarity_matrix, repos
 
-def extract_repopal():
+def extract_repopal(EVA=False):
     """
     Parse Repopal similarity data files.
     File format: {owner}__{repo}.txt
     Each line: {owner1}/{repo1}\t{owner2}/{repo2}\t1.0
     """
+    PATH = REPOPAL_RESULT if not EVA else EVA_REPOPAL_RESULT
     all_data = []
 
-    if not os.path.exists(REPOPAL_RESULT):
-        raise FileNotFoundError(f"Directory not found: {REPOPAL_RESULT}")
+    if not os.path.exists(PATH):
+        raise FileNotFoundError(f"Directory not found: {PATH}")
 
-    for file_name in os.listdir(REPOPAL_RESULT):
+    for file_name in os.listdir(PATH):
         if file_name.endswith('.txt') and ('|' in file_name or '__' in file_name):
-            file_path = os.path.join(REPOPAL_RESULT, file_name)
+            file_path = os.path.join(PATH, file_name)
             with open(file_path, 'r') as file:
                 for line in file:
                     parts = line.strip().split("\t")
@@ -136,7 +157,7 @@ def extract_owner_repo(url):
     return owner_repo
 
 
-def extract_crosssim():
+def extract_crosssim(EVA=False):
     """
     Parse CrossSim similarity data files.
     File format: {owner}_{repo}.txt
@@ -144,12 +165,14 @@ def extract_crosssim():
     """
     all_data = []
 
-    if not os.path.exists(CROSSSIM_RESULT):
-        raise FileNotFoundError(f"Directory not found: {CROSSSIM_RESULT}")
+    PATH = CROSSSIM_RESULT if not EVA else EVA_CROSSSIM_RESULT
 
-    for file_name in os.listdir(CROSSSIM_RESULT):
+    if not os.path.exists(PATH):
+        raise FileNotFoundError(f"Directory not found: {PATH}")
+
+    for file_name in os.listdir(PATH):
         if file_name.endswith('.txt') and '|' in file_name:
-            file_path = os.path.join(CROSSSIM_RESULT, file_name)
+            file_path = os.path.join(PATH, file_name)
             with open(file_path, 'r') as file:
                 for line in file:
                     parts = line.strip().split("\t")
@@ -166,9 +189,12 @@ def extract_crosssim():
     return pd.DataFrame(all_data)
 
 
-def extract_mudablue():
-    index_file = os.path.join(MUDABLUE_RESULT, "index.txt")
-    result_file = os.path.join(MUDABLUE_RESULT, "result.txt")
+def extract_mudablue(EVA=False): 
+
+    PATH = MUDABLUE_RESULT if not EVA else EVA_MUDABLUE_RESULT
+
+    index_file = os.path.join(PATH, "index.txt")
+    result_file = os.path.join(PATH, "result.txt")
 
     method_to_repo = {}
     with open(index_file, 'r') as f:

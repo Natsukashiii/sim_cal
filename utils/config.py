@@ -1,7 +1,7 @@
-import os
 import json
+import os
 
-DEFAULT_ATTRIBUTES = ["mudablue", "crosssim", "repopal","mock1"]
+DEFAULT_ATTRIBUTES = ["mudablue", "crosssim", "repopal","build"]
 
 def load_integrate_level_low():
     return load_config_value("integrate_level_low", default_value=1, expected_type=int)
@@ -10,6 +10,7 @@ def load_integrate_level_high():
     return load_config_value("integrate_level_high", default_value=4, expected_type=int)
 def load_pick_repo_number():
     value = load_config_value("pick_repo_num", default_value=300, expected_type=int)
+    print(f"Pick repo number loaded: {value}")
     if value==0:
         return None
     return load_config_value("pick_repo_num", default_value=300, expected_type=int)
@@ -21,6 +22,10 @@ def load_normalize():
 
 def load_attributes():
     return load_config_value("custom_attributes", default_value=DEFAULT_ATTRIBUTES, expected_type=list)
+
+def load_eva_attributes():
+    return load_config_value("eva_attributes", default_value=DEFAULT_ATTRIBUTES, expected_type=list)
+
 
 def load_config_value(key, default_value, expected_type=None):
     config_dic = load_config_json()

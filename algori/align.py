@@ -1,9 +1,11 @@
-from typing import List, Tuple, Optional, Set
+import random
+from typing import List, Optional, Set, Tuple
+
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, PowerTransformer
 import numpy as np
 import pandas as pd
-
+from sklearn.preprocessing import (MinMaxScaler, PowerTransformer,
+                                   StandardScaler)
 
 
 def stretch(original_matrix, source_name):
@@ -17,7 +19,6 @@ def stretch(original_matrix, source_name):
     reshaped_original_matrix = reshape_matrix(stretch_data, original_matrix.shape[0])
 
     return reshaped_original_matrix, min_val, max_val, crop_ratio
-
 
 
 def reshape_matrix(original_data, matrix_size):
@@ -42,7 +43,6 @@ def reshape_matrix(original_data, matrix_size):
     reshaped_original_matrix += reshaped_original_matrix.T
 
     return reshaped_original_matrix
-
 
 
 def stretch_to_zscore(data, use_log=False, iqr_multiplier=1.5, non_linear_mapping=None, verbose=False):
@@ -134,6 +134,78 @@ def print_stats(step, data, crop_ratio=None):
         print(f"Crop Ratio: {crop_ratio:.4f}")
 
 
+
+
+
+
+def align_list_eva(
+    data: List[Tuple[np.ndarray, List[str], str]],
+    repo_num: Optional[int] = None,
+    deterministic: bool = True,
+    seed: int = 42
+) -> Tuple[List[Tuple[np.ndarray, List[str], str]], List[str]]:
+    # Step 1: Find common repos across all sources (for default behavior)
+    all_sets = [set(repos) for _, repos, source in data if source != 'repopal']
+    if all_sets:
+        common_repos = set.intersection(*all_sets)
+    else:
+        common_repos = set()
+
+    # Step 2: Extend common repos with all repos from repopal source
+    repopal_repos = set()
+    for _, repos, source in data:
+        if source == 'repopal':
+            repopal_repos.update(repos)
+    full_repo_list = sorted(common_repos.union(repopal_repos))
+
+    # Step 3: Subset sampling
+    if repo_num is not None and repo_num < len(full_repo_list):
+        if deterministic:
+            random.seed(seed)
+        full_repo_list = sorted(random.sample(full_repo_list, repo_num))
+
+    # Step 4: Print mismatch report
+    print("🔍 Repo stats per source:")
+    for _, repos, source in data:
+        missing = sorted(set(full_repo_list) - set(repos))
+        print(f"  [{source}] total: {len(repos)} | missing in alignment: {len(missing)}")
+
+    # Step 5: Build aligned matrix
+    repo_index_map = {repo: i for i, repo in enumerate(full_repo_list)}
+    n = len(full_repo_list)
+    aligned_data = []
+
+    for sim_matrix, repos, source in data:
+        print(f"\n🔧 Aligning source: {source}")
+        if source == 'repopal':
+            # Expand to full_repo_list, fill 0 if missing
+            full_matrix = np.zeros((n, n))
+            old_index = {repo: i for i, repo in enumerate(repos)}
+            for i_old, repo_i in enumerate(repos):
+                for j_old, repo_j in enumerate(repos):
+                    i_new = repo_index_map[repo_i]
+                    j_new = repo_index_map[repo_j]
+                    full_matrix[i_new, j_new] = sim_matrix[i_old, j_old]
+            aligned_data.append((full_matrix, full_repo_list, source))
+        else:
+            # Trim to only common subset
+            kept_indices = [i for i, r in enumerate(repos) if r in full_repo_list]
+            name_to_index = {name: i for i, name in enumerate(repos)}
+            m = len(full_repo_list)
+            trimmed_matrix = np.zeros((m, m))
+            for i, repo_i in enumerate(full_repo_list):
+                for j, repo_j in enumerate(full_repo_list):
+                    if repo_i in name_to_index and repo_j in name_to_index:
+                        trimmed_matrix[i, j] = sim_matrix[name_to_index[repo_i], name_to_index[repo_j]]
+            aligned_data.append((trimmed_matrix, full_repo_list, source))
+
+    print(f"\n✅ Final aligned repo count: {len(full_repo_list)}")
+    return aligned_data, full_repo_list
+
+
+
+
+
 def align_list(
     data: List[Tuple[np.ndarray, List[str]]],
     repo_num: Optional[int] = None,
@@ -165,6 +237,8 @@ def align_list(
     aligned_data = []
     for similarity_matrix, repos,source in data:
         aligned_matrix, aligned_repos = align_single(similarity_matrix, repos, common_repos)
+
+    
         aligned_data.append((aligned_matrix, aligned_repos,source))
 
     print(f"Common Repositories: {len(common_repos)}" )

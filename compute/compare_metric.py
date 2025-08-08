@@ -1,10 +1,10 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
 from scipy.spatial.distance import cdist
+from scipy.stats import permutation_test, spearmanr
+
 from utils.path import PLOTS_DIR
-from scipy.stats import spearmanr, permutation_test
 
 
 def cal_spearman(matrix1, matrix2,name, IS_SPARSE=False, num_permutations=3000):
@@ -47,7 +47,7 @@ def cal_spearman(matrix1, matrix2,name, IS_SPARSE=False, num_permutations=3000):
 
     # Perform permutation test using SciPy
     def statistic(x):  # Only shuffle `x`
-        return spearmanr(x, upper_m2).statistic  # Ignore p-value, only return rho
+        return spearmanr(x, upper_m2).correlation  # Ignore p-value, only return rho
 
     res_permutation = permutation_test(
         (upper_m1,), statistic,
@@ -69,7 +69,7 @@ def cal_spearman(matrix1, matrix2,name, IS_SPARSE=False, num_permutations=3000):
     ax.legend()
 
     output_path = PLOTS_DIR / f"{name}_permutation_test.png"
-    plt.savefig(output_path, bbox_inches="tight", dpi=300)
+    # plt.savefig(output_path, bbox_inches="tight", dpi=300)
     plt.close(fig)
 
     print(f"Spearman (rho): {rho}, p_value: {p_value}")
@@ -133,6 +133,30 @@ def cal_frobenius(matrix1, matrix2, IS_SPARSE=False, normalization_method="log_s
 
     print("Frobenius distance:", frobenius_norm)
     return frobenius_norm
+
+def cal_rmse_frobenius(matrix1, matrix2, IS_SPARSE=False):
+    if isinstance(matrix1, pd.DataFrame):
+        matrix1 = matrix1.values
+    if isinstance(matrix2, pd.DataFrame):
+        matrix2 = matrix2.values
+
+    if matrix1.shape != matrix2.shape:
+        raise ValueError("The shape is different.")
+
+    if IS_SPARSE:
+        upper_tri1, upper_tri2 = upper_aligned(matrix1, matrix2)
+        diff = upper_tri1 - upper_tri2
+    else:
+        diff = matrix1 - matrix2
+
+    frobenius_norm = np.linalg.norm(diff, 'fro')  
+    rmse = frobenius_norm / np.sqrt(diff.size)    
+
+    # print("Frobenius distance:", frobenius_norm)
+    # print("Normalized Frobenius distance (RMSE):", rmse)
+
+    return frobenius_norm, rmse
+
 
 
 def upper_aligned(matrix1, matrix2, filter_zeros=False):

@@ -1,34 +1,49 @@
 import itertools
 
-import numpy as np
-from data_process import extract
-import cluster.canopy
 import algori
-from algori import align, distance, combine
-from compute import overlap
+import cluster.canopy
+from algori import align, combine, distance
 from cluster.distance import analysis_tuple_matrix_multi_dimension
-from cluster.visualize import visualize_heatmap, visualize_combined_matrices, visualize_comparison_multiple
-from utils.file import save_all_results_to_csv
-from utils.config import load_attributes,load_normalize,load_integrate_level_low,load_integrate_level_high,load_pick_repo_number
+from cluster.visualize import (visualize_combined_matrices,
+                               visualize_comparison_multiple,
+                               visualize_heatmap)
+from compute import overlap
+from data_process import extract
+from utils.config import (load_attributes, load_eva_attributes,
+                          load_integrate_level_high, load_integrate_level_low,
+                          load_pick_repo_number)
+from utils.file import save_all_results_to_csv, save_combined_distance_matrix
 
-# This number is used to pick the top N repositories from the similarity matrix for testing the function(to reduce the computation time)
-#default None
-PICK_REPO_NUM = load_pick_repo_number()
+#############
+# Following variables are edited in config.py
+PICK_REPO_NUM = load_pick_repo_number() #This number is used to pick the top N repositories from the similarity matrix for testing the function(to reduce the computation time)
 DIMENSION_LEVEL_LOW =load_integrate_level_low()
 DIMENSION_LEVEL_HIGH = load_integrate_level_high()
-GEN_HEATMAP = False
+#############
+
+GEN_HEATMAP = True
+# save the esm res
+SAVE_DISTANCE_MATRIX = True
+# evaluation if using EVA dataset, also need to provided the eva results.
+EXEC_EVA= False
 
 def compare_multiple_attributes():
     """
     Compare multiple attributes
     """
     print("-------------------------------------- 0. Load Config--------------------------------------")
-    attributes = load_attributes()
+    if EXEC_EVA:
+        attributes = load_eva_attributes()
+    else:
+        attributes = load_attributes()
 
     print("-------------------------------------- 1. Load Similarity Data --------------------------------------")
     origin_sim_matrix_list =[]
     for source in attributes:
-        matrix, repos = extract.load_data(source)
+        if EXEC_EVA:
+            matrix, repos = extract.load_eva_data(source)
+        else:
+            matrix, repos = extract.load_data(source)
         origin_sim_matrix_list.append((matrix, repos,source))
     print(f"2. Similarity Data for attributes: {attributes} loaded")
 
@@ -49,7 +64,6 @@ def compare_multiple_attributes():
         # visualize_heatmap(aligned_sim_matrix_list, attributes, "rq1_matrix_compare_before_normalize.pdf")
         visualize_heatmap(normalize_sim_matrix_list, attributes, "rq1_matrix_compare.pdf")
         print("done")
-        return
 
     print("-------------------------------------- 4. Build Distance --------------------------------------")
     distance_matrix_map = {}
@@ -73,7 +87,7 @@ def compare_multiple_attributes():
     print("-------------------------------------- 6. Generate Combinations --------------------------------------")
 
     combinations = []
-    for level in range(DIMENSION_LEVEL_LOW, DIMENSION_LEVEL_HIGH):  #enable multi dimension
+    for level in range(DIMENSION_LEVEL_LOW, DIMENSION_LEVEL_HIGH+1):  #enable multi dimension
         combinations.extend(list(itertools.combinations(attributes, level)))
     print(f"Generated combinations: {combinations}")
 
@@ -86,13 +100,20 @@ def compare_multiple_attributes():
             single_distance_matrix = distance_matrix_map[combination[0]]
             combinations_distance_dict[combination] = single_distance_matrix
             print(f"Single attribute {combination} added directly.")
+            if SAVE_DISTANCE_MATRIX:
+                save_combined_distance_matrix(single_distance_matrix, common_repos, combination)
         else:
             selected_matrices = [distance_matrix_map[attr] for attr in combination]
             combine_distance_matrix = combine.combine_multi_dimension(*selected_matrices, common_repos=common_repos)
             combine_min, combine_mean, combine_max = analysis_tuple_matrix_multi_dimension(combine_distance_matrix)
             print(f"Combine {combination} completed: distance: np.min={combine_min}, np.mean = {combine_mean}, np.max = {combine_max}")
             combinations_distance_dict[combination] = combine_distance_matrix
+            if SAVE_DISTANCE_MATRIX:
+                save_combined_distance_matrix(combine_distance_matrix, common_repos, combination)
 
+
+
+    
     print("-------------------------------------- 6. Generate Cluster Result --------------------------------------")
     combinations_cluster_result_dict = {}
 
@@ -142,8 +163,6 @@ def compare_multiple_attributes():
 
             save_all_results_to_csv(result)
     print("-------------------------------------- Finished --------------------------------------")
-
-
 
 
 compare_multiple_attributes()

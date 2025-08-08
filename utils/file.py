@@ -1,9 +1,28 @@
+import csv
+import os
+
 import pandas as pd
 
 from utils.path import RESULT_DIR
-import os
-import csv
 
+
+def save_combined_distance_matrix(matrix, repos, combination):
+    """
+    Save the combined distance matrix as a CSV file.
+
+    Args:
+        matrix (np.ndarray): The distance matrix to save.
+        repos (List[str]): The list of repository names (used as row/column labels).
+        combination (Tuple[str]): The attribute combination used to build the matrix.
+        save_dir (str): The output directory to save the CSV file.
+    """
+    save_dir = os.path.join(RESULT_DIR, "combined_distance_matrices")
+    os.makedirs(save_dir, exist_ok=True)
+    combination_name = "_".join(combination)
+    df = pd.DataFrame(matrix, index=repos, columns=repos)
+    csv_path = os.path.join(save_dir, f"distance_{combination_name}.csv")
+    df.to_csv(csv_path)
+    print(f"✅ Saved combined distance matrix to {csv_path}")
 def save_results_to_csv(results,filename="results.csv"):
     """
     Save the results to a CSV file.

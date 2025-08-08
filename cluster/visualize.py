@@ -1,15 +1,23 @@
 import os.path
+
+import matplotlib.pyplot as plt
 import numpy as np
-from apprise.plugins import sns
+import pandas as pd
+import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS
-from cluster.distance import  cal_distance,cal_distance_multi_dimension
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 
-from compute.compare_metric import cal_spearman,cal_gromov,cal_frobenius
-from utils.path import RESULT_DIR,PLOTS_DIR
+from cluster.distance import cal_distance, cal_distance_multi_dimension
+from compute.compare_metric import cal_gromov, cal_rmse_frobenius, cal_spearman
+from utils.path import PLOTS_DIR, RESULT_DIR
+
+name_map = {
+    "repopal": "documentation",
+    "crosssim": "dependency",
+    "mudablue": "code",
+     "build": "build"
+}
+
 
 def visualize_heatmap(similarity_matrices, labels, file_name, cmap="YlGnBu"):
     """
@@ -24,7 +32,7 @@ def visualize_heatmap(similarity_matrices, labels, file_name, cmap="YlGnBu"):
     METRICS = ["Spearman", "Frobenius", "Gromov"]
     num_metrics = len(METRICS)
 
-    fig, axes = plt.subplots(1, num_metrics, figsize=(12, 6))
+    fig, axes = plt.subplots(1, num_metrics, figsize=(22, 6))
 
     for i, metric in enumerate(METRICS):
         metric_matrix = np.zeros((len(labels), len(labels)))
@@ -42,12 +50,11 @@ def visualize_heatmap(similarity_matrices, labels, file_name, cmap="YlGnBu"):
 
                 if metric == "Spearman":
                     correlation, _ = cal_spearman(matrix1, matrix2,f"{method1}_{method2}")
-                    # correlation, _ = spearmanr(matrix1.flatten(), matrix2.flatten())
                     metric_matrix[m1_idx, m2_idx] = correlation
                     metric_matrix[m2_idx, m1_idx] = correlation
 
                 elif metric == "Frobenius":
-                    frobenius_dist = cal_frobenius(matrix1, matrix2)
+                    frobenius_dist,frobenius_rmse = cal_rmse_frobenius(matrix1, matrix2)
                     # frobenius_dist = np.linalg.norm(matrix1 - matrix2, 'fro')
                     metric_matrix[m1_idx, m2_idx] = frobenius_dist
                     metric_matrix[m2_idx, m1_idx] = frobenius_dist
@@ -61,11 +68,13 @@ def visualize_heatmap(similarity_matrices, labels, file_name, cmap="YlGnBu"):
         if np.all(metric_matrix == 0):
             print(f"Warning: {metric} metric_matrix is all zeros!")
 
-        metric_df = pd.DataFrame(metric_matrix, index=labels, columns=labels)
+        # metric_df = pd.DataFrame(metric_matrix, index=labels, columns=labels)
+        mapped_labels = [name_map.get(label, label) for label in labels]
+        metric_df = pd.DataFrame(metric_matrix, index=mapped_labels, columns=mapped_labels)
 
         sns.heatmap(metric_df, annot=True, fmt=".4f", cmap=cmap, ax=axes[i],
                     vmin=-1 if metric == "Spearman" else None, vmax=1 if metric == "Spearman" else None,
-                    linewidths=0.5, square=False, cbar=True,cbar_kws={"shrink": 0.21},annot_kws={"size": 9})
+                    linewidths=0.5, square=False, cbar=True,cbar_kws={"shrink": 0.21},annot_kws={"size": 14})
 
         # only keep the first ylabel
         if i == 0:
@@ -176,11 +185,15 @@ def visualize_comparison_multiple(
             # label=f"{label} (Density)",
             linestyle="--"
         )
+    
+
+        
     # ax1.set_title("Original Similarity Distribution")
     ax1.set_xlabel("")
     ax1.xaxis.set_label_coords(1, -0.1)
     ax1.set_ylabel("Frequency (Count)")
     ax1_2.set_ylabel("")
+    ax1.set_title("(a)")
     ax1.legend(loc="upper right")
     if xlim_original:
         ax1.set_xlim(xlim_original)
@@ -215,6 +228,7 @@ def visualize_comparison_multiple(
     ax2.set_xlabel(" ")
     ax1.xaxis.set_label_coords(0.5, -0.1)
     ax2.set_ylabel("")
+    ax2.set_title("(b)")
     # ax2_2.set_ylabel("Density")
     ax2.legend(loc="upper right")
     if xlim_normalized:

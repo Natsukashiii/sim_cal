@@ -1,17 +1,18 @@
+import os
 import random
+import time
 import traceback
 from collections import Counter
 
 import numpy as np
-import time
 from scipy.stats import skew
 
-from cluster.distance import cal_distance, cal_distance_multi_dimension,analysis_tuple_matrix_multi_dimension
-import os
-from utils.path import RESULT_DIR
-from cluster.visualize import visualize_cluster_results, visualize_silhouette_results
+from cluster.distance import (analysis_tuple_matrix_multi_dimension,
+                              cal_distance, cal_distance_multi_dimension)
+from cluster.visualize import (visualize_cluster_results,
+                               visualize_silhouette_results)
 from utils.config import load_num_steps
-
+from utils.path import RESULT_DIR
 
 IS_DYNAMTIC = True
 USE_KMEANS = False
@@ -98,7 +99,7 @@ def canopy_clustering_multi_dimension(distance_matrix, repos, file_name):
             best_labels = cluster_labels.copy()
             best_cluster_nums = len(unique_labels)
 
-        print(f"processed {t1} done, silhouette: {silhouette}, n_clusters: {len(unique_labels)}")
+        # print(f"processed {t1} done, silhouette: {silhouette}, n_clusters: {len(unique_labels)}")
 
     label_counts = Counter(label for label in best_labels if label != -1)
     single_point_clusters = sum(1 for count in label_counts.values() if count == 1)
@@ -113,17 +114,13 @@ def canopy_clustering_multi_dimension(distance_matrix, repos, file_name):
     }
 
     print(
-        f"{file_name} Best Cluster Result: T1: {best_result['best_t1']}, Silhouette Coefficient: {best_result['best_silhouette']:.4f}, Number of Clusters: {best_result['best_cluster_nums']}, Single Point Ratio: {best_result['single_point_ratio']:.4f}")
+        f"{file_name} Best Cluster Result: T1: {best_result['best_t1']}, Silhouette Coefficient: {best_result['best_silhouette']:.4f}, Number of Clusters: {best_result['best_cluster_nums']}")
 
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"!!!!!! Clustering for {file_name} completed in {elapsed_time:.2f} seconds.")
 
-    visualize_silhouette_results(plot_info, best_result,
-                                 os.path.join(RESULT_DIR, f"rq2_silhouette_plot_{file_name}.pdf"))
-    visualize_cluster_results(distance_matrix, best_labels, repos,
-                              os.path.join(RESULT_DIR, f"cluster_plot_{file_name}.png"))
-    save_cluster_info(best_result, os.path.join(RESULT_DIR, f"cluster_info_{file_name}.txt"))
+    # save_cluster_info(best_result, os.path.join(RESULT_DIR, f"cluster_info_{file_name}.txt"))
 
     return best_result
 

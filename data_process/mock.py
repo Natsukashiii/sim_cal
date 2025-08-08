@@ -1,17 +1,16 @@
 import os
-from sklearn.metrics.pairwise import cosine_similarity
+from hashlib import sha256
+
 import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
 from Levenshtein import distance as levenshtein_distance
 from sklearn.feature_extraction.text import CountVectorizer
-from hashlib import sha256
+from sklearn.metrics.pairwise import cosine_similarity, manhattan_distances
+
 from utils.path import REPOS_FILE_PATH
-from sklearn.metrics.pairwise import manhattan_distances
 
 
-# todo hashcode with 3number, tuple geometric space
-
+# some mock similarity functions
 def hash_to_3d(repo_name):
     """
     Map a repository name to a 3D coordinate using a hash function.

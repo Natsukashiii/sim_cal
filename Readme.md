@@ -22,6 +22,8 @@ Update the following fields in `config.py`:
 ```bash
 python run.py
 
+(The execution may take 15mins ish)
+
 
 ### Environments
 Python 3.11.7

@@ -13,6 +13,6 @@
   ],
   "normalize": true,
   "integrate_level_low": 1,
-  "integrate_level_high": 4,
-  "pick_repo_num": 80
+  "integrate_level_high": 3,
+  "pick_repo_num": 0
 }

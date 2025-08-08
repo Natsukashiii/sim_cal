@@ -7,6 +7,7 @@ from utils.path import RESULT_DIR
 
 
 def save_combined_distance_matrix(matrix, repos, combination):
+    
     """
     Save the combined distance matrix as a CSV file.
 
@@ -16,6 +17,7 @@ def save_combined_distance_matrix(matrix, repos, combination):
         combination (Tuple[str]): The attribute combination used to build the matrix.
         save_dir (str): The output directory to save the CSV file.
     """
+    repos = list(repos) 
     save_dir = os.path.join(RESULT_DIR, "combined_distance_matrices")
     os.makedirs(save_dir, exist_ok=True)
     combination_name = "_".join(combination)

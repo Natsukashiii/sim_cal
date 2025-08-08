@@ -61,9 +61,7 @@ def compare_multiple_attributes():
                                   labels=attributes,
                                   file_name="normalize_similarity.pdf")
     if GEN_HEATMAP:
-        # visualize_heatmap(aligned_sim_matrix_list, attributes, "rq1_matrix_compare_before_normalize.pdf")
         visualize_heatmap(normalize_sim_matrix_list, attributes, "rq1_matrix_compare.pdf")
-        print("done")
 
     print("-------------------------------------- 4. Build Distance --------------------------------------")
     distance_matrix_map = {}

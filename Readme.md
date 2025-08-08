@@ -1,13 +1,29 @@
-## Run with your own data
+## ReadMe
 
-#### Add data source
-Add similar data source to `input` folder
+### 1. Add Data Sources
+Place your data source(s) into the `input/` folder as `.csv` files.
+Each CSV should represent the output of a model or feature extractor.  
 
 
-###### Configue
-- Update `config.py` with your data source name. 
-  - custom_attributes: the different data source name
-  - integrate_level_low-integrate_level_high: integration of integration level (eg. 1-4, means combine and compre between 2-3 dimension)
-  - pick_repo_num: number of repositories to pick for each data source(0 means all)
-  - t1_range_steps: select interval of t1 steps
+
+### 2. Configure Parameters (`config.py`)
+
+Update the following fields in `config.py`:
+
+- **custom_attributes**: List of data source names (must match CSV file names in `input/`)
+- **normalize**: Whether to apply normalization across different data sources (apply to current data source)
+- **integrate_level_low / integrate_level_high**: Range of how many models to combine and compare.  
+  Example: 1 to 3 means comparisons of individual models up to 3-model combinations.
+- **pick_repo_num**: Number of repositories to sample (use `0` to include all)
+---
+
+### 3. Run the System
+
+```bash
+python run.py
+
+
+### Environments
+Python 3.11.7
+pip install -r requirements.txt
 

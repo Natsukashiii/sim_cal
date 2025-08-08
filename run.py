@@ -157,7 +157,7 @@ def compare_multiple_attributes():
                 "overlap_ratio": overlap_ratio
             }
 
-            print(f">>>>>>>>>>>>>>>>>>>>>>>>  {base} + {other} overlap ratio: {overlap_ratio}")
+            # print(f">>>>>>>>>>>>>>>>>>>>>>>>  {base} + {other} overlap ratio: {overlap_ratio}")
 
             save_all_results_to_csv(result)
     print("-------------------------------------- Finished --------------------------------------")
